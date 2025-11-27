@@ -9,6 +9,29 @@ The application runs in Docker on `localhost:5000`, and Nginx on the host system
 - Domain name configured (DNS A record pointing to your server)
 - Optional: SSL certificate (Let's Encrypt recommended)
 
+## Security Model
+
+The nginx configuration templates implement strict access controls:
+
+**Publicly Accessible:**
+- ✅ Dashboard frontend (HTML/CSS/JS)
+- ✅ `/api/data/*` - Read-only data endpoints (needed for dashboard)
+- ✅ Static files (CSS, JS, images)
+
+**Restricted (Localhost Only):**
+- ❌ `/api/jobs` - Job management
+- ❌ `/api/scheduler/*` - Scheduler control
+- ❌ `/api/templates/*` - Template management
+- ❌ `/api/health` - Health check endpoint
+- ❌ Database on port 5432
+
+This means:
+- **Public users** can view the dashboard and see collected news/analyses
+- **Administrators** must SSH into the server to manage jobs and control the scheduler
+- **Database and API** are bound to localhost only and not directly accessible from external networks
+
+See [SECURITY.md](../SECURITY.md) for complete security documentation.
+
 ## Step 1: Deploy Application with Docker
 
 ```bash

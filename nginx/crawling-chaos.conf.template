@@ -11,9 +11,9 @@
 
 # Upstream definition for Flask API
 upstream crawling_chaos_api {
-    server localhost:5000;
+    # server localhost:5000;
     # If running in Docker on same host, use:
-    # server 127.0.0.1:5000;
+    server 127.0.0.1:5000;
 
     # For load balancing across multiple instances:
     # server localhost:5000;
@@ -113,9 +113,17 @@ server {
         proxy_busy_buffers_size 8k;
     }
 
-    # API endpoints - with rate limiting
-    location /api/ {
-        limit_req zone=api_limit burst=5 nodelay;
+    # SECURITY: Block administrative API endpoints
+    # These endpoints allow job management and should not be publicly accessible
+    location ~ ^/api/(jobs|scheduler|templates) {
+        deny all;
+        return 403 "Access denied";
+    }
+
+    # Public read-only data endpoints for dashboard
+    # These are needed for the frontend to display data
+    location ~ ^/api/data/ {
+        limit_req zone=api_limit burst=10 nodelay;
 
         proxy_pass http://crawling_chaos_api;
         proxy_http_version 1.1;
@@ -125,31 +133,31 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Port $server_port;
         proxy_set_header Connection "";
 
-        # Timeouts (longer for API operations)
-        proxy_connect_timeout 90s;
-        proxy_send_timeout 90s;
-        proxy_read_timeout 90s;
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
 
         # Disable buffering for API responses
         proxy_buffering off;
         proxy_request_buffering off;
     }
 
-    # Health check endpoint - no rate limiting
-    location /api/health {
-        limit_req zone=api_limit burst=10 nodelay;
+    # Health check endpoint (optional: you can deny this too if you don't need external monitoring)
+    location = /api/health {
+        # Allow only from localhost for internal monitoring
+        # Comment out these lines if you need external health checks
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
 
         proxy_pass http://crawling_chaos_api;
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
 
         # Short timeouts for health checks
         proxy_connect_timeout 5s;
@@ -157,6 +165,12 @@ server {
         proxy_read_timeout 5s;
 
         access_log off;
+    }
+
+    # Block all other /api/ endpoints
+    location ~ ^/api/ {
+        deny all;
+        return 403 "Access denied";
     }
 
     # Static files caching (if served separately)

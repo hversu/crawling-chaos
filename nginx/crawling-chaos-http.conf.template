@@ -64,9 +64,17 @@ server {
         proxy_read_timeout 60s;
     }
 
-    # API endpoints - with rate limiting
-    location /api/ {
-        limit_req zone=api_limit burst=5 nodelay;
+    # SECURITY: Block administrative API endpoints
+    # These endpoints allow job management and should not be publicly accessible
+    location ~ ^/api/(jobs|scheduler|templates) {
+        deny all;
+        return 403 "Access denied";
+    }
+
+    # Public read-only data endpoints for dashboard
+    # These are needed for the frontend to display data
+    location ~ ^/api/data/ {
+        limit_req zone=api_limit burst=10 nodelay;
 
         proxy_pass http://crawling_chaos_api;
         proxy_http_version 1.1;
@@ -78,15 +86,19 @@ server {
         proxy_set_header Connection "";
 
         # Timeouts
-        proxy_connect_timeout 90s;
-        proxy_send_timeout 90s;
-        proxy_read_timeout 90s;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
 
         proxy_buffering off;
     }
 
-    # Health check endpoint
-    location /api/health {
+    # Health check endpoint (localhost only)
+    location = /api/health {
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+
         proxy_pass http://crawling_chaos_api;
         proxy_http_version 1.1;
 
@@ -98,6 +110,12 @@ server {
         proxy_read_timeout 5s;
 
         access_log off;
+    }
+
+    # Block all other /api/ endpoints
+    location ~ ^/api/ {
+        deny all;
+        return 403 "Access denied";
     }
 
     # Static files caching

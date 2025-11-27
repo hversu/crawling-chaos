@@ -113,6 +113,8 @@ Open http://localhost:5000 in your browser to see the dashboard.
 
 For production deployment on servers with Nginx, the application runs in Docker on `localhost:5000`, and you configure Nginx on your host system to proxy requests to it.
 
+**Security Note:** The nginx configuration restricts public access to read-only endpoints. Administrative API endpoints (job management, scheduler control) are only accessible from localhost. See [SECURITY.md](SECURITY.md) for details.
+
 **Quick Setup:**
 
 1. Deploy the application with Docker:
@@ -139,7 +141,14 @@ sudo nginx -t && sudo systemctl reload nginx
 
 Your application is now accessible at `https://news.example.com` with security headers, rate limiting, and SSL.
 
-See [NGINX_DEPLOYMENT.md](NGINX_DEPLOYMENT.md) for detailed configuration, multi-domain setup, troubleshooting, and advanced options.
+**What's Publicly Accessible:**
+- ✅ Dashboard frontend (read-only view)
+- ✅ `/api/data/*` - News and analysis data
+- ❌ `/api/jobs` - Job management (localhost only)
+- ❌ `/api/scheduler` - Scheduler control (localhost only)
+- ❌ Database (localhost only)
+
+See [NGINX_DEPLOYMENT.md](NGINX_DEPLOYMENT.md) for detailed configuration and [SECURITY.md](SECURITY.md) for security model details.
 
 ## API Endpoints
 

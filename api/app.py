@@ -9,7 +9,7 @@ import json
 from handlers.job_handler import JobHandler
 from handlers.db_handler import DatabaseHandler
 
-app = Flask(__name__, static_folder='../interface', static_url_path='')
+app = Flask(__name__, static_folder='interface', static_url_path='')
 CORS(app)
 
 # Initialize handlers

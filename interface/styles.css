@@ -104,6 +104,8 @@ main {
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
     animation: fadeIn 0.5s ease-in;
+    overflow-x: hidden;
+    width: 100%;
 }
 
 @keyframes fadeIn {
@@ -120,6 +122,12 @@ main {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     animation: slideIn 0.5s ease-out;
     border-left: 4px solid var(--highlight-color);
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes slideIn {
@@ -214,6 +222,71 @@ main {
     margin-top: 1rem;
 }
 
+/* News List Styles */
+.news-list {
+    overflow-y: auto;
+    max-height: calc(80vh - 150px);
+}
+
+.news-item {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.news-item:last-child {
+    border-bottom: none;
+}
+
+.news-title {
+    font-size: 1rem;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.news-date {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Analysis Text Styles */
+.analysis-text {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 5px;
+    line-height: 1.6;
+    overflow-y: auto;
+    max-height: calc(80vh - 150px);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Panel Count */
+.panel-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Empty Message */
+.empty-message {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 2rem;
+}
+
+/* Ensure panel content scrolls */
+.panel-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
 .panel-content .meta {
     font-size: 0.85rem;
     color: var(--text-muted);
@@ -252,18 +325,28 @@ footer p {
 /* Responsive Design */
 @media (max-width: 1400px) {
     .grid-container {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .panel {
+        max-height: none;
+    }
+
+    .news-list,
+    .analysis-text {
+        max-height: 500px;
     }
 }
 
 @media (max-width: 900px) {
-    .grid-container {
-        grid-template-columns: 1fr;
-    }
-
     .refresh-btn {
         position: static;
         margin-top: 1rem;
+    }
+
+    header h1 {
+        font-size: 2rem;
     }
 }
 

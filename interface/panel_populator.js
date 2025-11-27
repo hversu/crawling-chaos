@@ -53,9 +53,68 @@ async function fetchAllData() {
 }
 
 /**
- * Create a panel element
+ * Create NEWS list panel showing all articles
  */
-function createPanel(type, data) {
+function createNewsListPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'panel news';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
+
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'panel-type';
+    typeLabel.textContent = 'NEWS';
+
+    const count = document.createElement('span');
+    count.className = 'panel-count';
+    count.textContent = `${allData.news.length} articles`;
+
+    header.appendChild(typeLabel);
+    header.appendChild(count);
+
+    const content = document.createElement('div');
+    content.className = 'panel-content';
+
+    if (allData.news.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = 'No news articles collected yet';
+        content.appendChild(empty);
+    } else {
+        const list = document.createElement('div');
+        list.className = 'news-list';
+
+        allData.news.forEach(article => {
+            const item = document.createElement('div');
+            item.className = 'news-item';
+
+            const title = document.createElement('h4');
+            title.className = 'news-title';
+            title.textContent = article.title || 'Untitled';
+
+            const date = document.createElement('p');
+            date.className = 'news-date';
+            date.textContent = formatTimestamp(article.publish_date);
+
+            item.appendChild(title);
+            item.appendChild(date);
+            list.appendChild(item);
+        });
+
+        content.appendChild(list);
+    }
+
+    panel.appendChild(header);
+    panel.appendChild(content);
+
+    return panel;
+}
+
+/**
+ * Create analysis panel (Claude or GPT)
+ */
+function createAnalysisPanel(type, data) {
     const panel = document.createElement('div');
     panel.className = `panel ${type}`;
 
@@ -64,7 +123,7 @@ function createPanel(type, data) {
 
     const typeLabel = document.createElement('span');
     typeLabel.className = 'panel-type';
-    typeLabel.textContent = type.toUpperCase();
+    typeLabel.textContent = type === 'claude' ? 'CLAUDE ANALYSIS' : 'GPT ANALYSIS';
 
     const timestamp = document.createElement('span');
     timestamp.className = 'panel-timestamp';
@@ -72,62 +131,20 @@ function createPanel(type, data) {
     const content = document.createElement('div');
     content.className = 'panel-content';
 
-    // Build panel content based on type
-    if (type === 'news') {
-        timestamp.textContent = formatTimestamp(data.collected_at);
-
-        const title = document.createElement('h3');
-        title.textContent = data.title || 'No title';
-
-        const summary = document.createElement('p');
-        summary.className = 'summary';
-        summary.textContent = data.summary || 'No summary available';
-
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-
-        if (data.publish_date) {
-            const publishDate = document.createElement('p');
-            publishDate.textContent = `Published: ${formatTimestamp(data.publish_date)}`;
-            meta.appendChild(publishDate);
-        }
-
-        if (data.url) {
-            const link = document.createElement('a');
-            link.href = data.url;
-            link.target = '_blank';
-            link.textContent = 'Read full article →';
-            meta.appendChild(link);
-        }
-
-        content.appendChild(title);
-        content.appendChild(summary);
-        content.appendChild(meta);
-
-    } else if (type === 'claude') {
-        timestamp.textContent = formatTimestamp(data.created_at);
-
-        const title = document.createElement('h3');
-        title.textContent = `Analysis: ${data.news_title || 'News Article'}`;
+    if (data.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = `No ${type} analysis available yet`;
+        content.appendChild(empty);
+    } else {
+        // Show the most recent analysis
+        const latest = data[0];
+        timestamp.textContent = formatTimestamp(latest.created_at);
 
         const analysis = document.createElement('div');
-        analysis.className = 'analysis';
-        analysis.textContent = data.analysis_text || 'No analysis available';
+        analysis.className = 'analysis-text';
+        analysis.textContent = latest.analysis_text || 'No analysis available';
 
-        content.appendChild(title);
-        content.appendChild(analysis);
-
-    } else if (type === 'gpt') {
-        timestamp.textContent = formatTimestamp(data.created_at);
-
-        const title = document.createElement('h3');
-        title.textContent = `Analysis: ${data.news_title || 'News Article'}`;
-
-        const analysis = document.createElement('div');
-        analysis.className = 'analysis';
-        analysis.textContent = data.analysis_text || 'No analysis available';
-
-        content.appendChild(title);
         content.appendChild(analysis);
     }
 
@@ -141,7 +158,7 @@ function createPanel(type, data) {
 }
 
 /**
- * Create a 3xN grid with randomized panel order
+ * Create 3-column layout: NEWS | CLAUDE | GPT
  */
 function createGrid() {
     const container = document.getElementById('gridContainer');
@@ -162,29 +179,17 @@ function createGrid() {
         return;
     }
 
-    // Create array of all panels with their type
-    const allPanels = [
-        ...allData.news.map(item => ({ type: 'news', data: item })),
-        ...allData.claude.map(item => ({ type: 'claude', data: item })),
-        ...allData.gpt.map(item => ({ type: 'gpt', data: item }))
-    ];
+    // Create NEWS panel (all articles in one panel)
+    const newsPanel = createNewsListPanel();
+    container.appendChild(newsPanel);
 
-    // Shuffle panels randomly
-    const shuffledPanels = shuffleArray(allPanels);
+    // Create CLAUDE analysis panel
+    const claudePanel = createAnalysisPanel('claude', allData.claude);
+    container.appendChild(claudePanel);
 
-    // Calculate number of complete rows
-    const numRows = Math.ceil(shuffledPanels.length / PANELS_PER_ROW);
-
-    // Create rows with 3 panels each
-    let panelIndex = 0;
-    for (let row = 0; row < numRows; row++) {
-        for (let col = 0; col < PANELS_PER_ROW && panelIndex < shuffledPanels.length; col++) {
-            const panelData = shuffledPanels[panelIndex];
-            const panel = createPanel(panelData.type, panelData.data);
-            container.appendChild(panel);
-            panelIndex++;
-        }
-    }
+    // Create GPT analysis panel
+    const gptPanel = createAnalysisPanel('gpt', allData.gpt);
+    container.appendChild(gptPanel);
 }
 
 /**

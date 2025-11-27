@@ -4,8 +4,8 @@ Fetches news articles based on query string using Google News RSS feed
 """
 import feedparser
 import requests
-from datetime import datetime
-from typing import Dict, List, Any
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
 import json
 
 
@@ -20,13 +20,14 @@ class GoogleNewsCollector:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
 
-    def collect(self, query: str, max_results: int = 10) -> Dict[str, Any]:
+    def collect(self, query: str, max_results: int = 10, days_to_lookback: Optional[int] = None) -> Dict[str, Any]:
         """
         Collect news articles for a given query
 
         Args:
             query: Search query string
             max_results: Maximum number of results to return
+            days_to_lookback: Optional number of days to look back for articles (filters out older articles)
 
         Returns:
             Dictionary with status and articles list
@@ -53,23 +54,51 @@ class GoogleNewsCollector:
                     'articles': []
                 }
 
+            # Calculate cutoff date if days_to_lookback is specified
+            cutoff_date = None
+            if days_to_lookback is not None and days_to_lookback > 0:
+                cutoff_date = datetime.utcnow() - timedelta(days=days_to_lookback)
+
             articles = []
-            for entry in feed.entries[:max_results]:
+            for entry in feed.entries:
+                # Parse the article date
+                publish_date_str = self._parse_date(entry.get('published', ''))
+
+                # Filter by date if cutoff is specified
+                if cutoff_date:
+                    try:
+                        publish_date = datetime.fromisoformat(publish_date_str.replace('Z', '+00:00'))
+                        # Make cutoff_date timezone-aware if publish_date is
+                        if publish_date.tzinfo is not None and cutoff_date.tzinfo is None:
+                            cutoff_date = cutoff_date.replace(tzinfo=publish_date.tzinfo)
+
+                        # Skip articles older than cutoff
+                        if publish_date < cutoff_date:
+                            continue
+                    except:
+                        # If date parsing fails, include the article
+                        pass
+
                 article = {
                     'title': entry.get('title', ''),
                     'summary': entry.get('summary', ''),
                     'url': entry.get('link', ''),
-                    'publish_date': self._parse_date(entry.get('published', '')),
+                    'publish_date': publish_date_str,
                     'source': entry.get('source', {}).get('title', 'Unknown')
                 }
                 articles.append(article)
+
+                # Stop if we've reached max_results
+                if len(articles) >= max_results:
+                    break
 
             return {
                 'status': 'success',
                 'query': query,
                 'count': len(articles),
                 'articles': articles,
-                'collected_at': datetime.utcnow().isoformat()
+                'collected_at': datetime.utcnow().isoformat(),
+                'days_to_lookback': days_to_lookback
             }
 
         except Exception as e:
@@ -90,10 +119,10 @@ class GoogleNewsCollector:
 
 
 # Standalone function for easy importing
-def collect_google_news(query: str, max_results: int = 10) -> Dict[str, Any]:
+def collect_google_news(query: str, max_results: int = 10, days_to_lookback: Optional[int] = None) -> Dict[str, Any]:
     """Convenience function to collect Google News"""
     collector = GoogleNewsCollector()
-    return collector.collect(query, max_results)
+    return collector.collect(query, max_results, days_to_lookback)
 
 
 if __name__ == '__main__':

@@ -82,6 +82,82 @@ class GPTHandler:
                 'analysis': None
             }
 
+    def analyze_batch(
+        self,
+        system_prompt: str,
+        articles: list,
+        user_prompt_template: str,
+        model: str = None,
+        max_tokens: int = 8192,
+        temperature: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Analyze multiple articles together in a single prompt
+
+        Args:
+            system_prompt: System prompt for GPT
+            articles: List of article dictionaries
+            user_prompt_template: Template for formatting the batch prompt
+            model: GPT model to use (default: gpt-4-turbo-preview)
+            max_tokens: Maximum tokens in response
+            temperature: Sampling temperature
+
+        Returns:
+            Dictionary with status and response
+        """
+        try:
+            # Format all articles into a single prompt
+            articles_text = ""
+            for idx, article in enumerate(articles, 1):
+                articles_text += f"\n--- Article {idx} ---\n"
+                articles_text += f"Title: {article.get('title', 'N/A')}\n"
+                articles_text += f"Source: {article.get('source', 'Unknown')}\n"
+                articles_text += f"Published: {article.get('publish_date', 'N/A')}\n"
+                articles_text += f"URL: {article.get('url', 'N/A')}\n"
+                articles_text += f"Summary: {article.get('summary', 'N/A')}\n"
+
+            # Use template or default format
+            user_prompt = user_prompt_template.format(
+                article_count=len(articles),
+                articles=articles_text
+            )
+
+            response = self.client.chat.completions.create(
+                model=model or self.default_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+
+            # Extract response text
+            response_text = response.choices[0].message.content
+
+            return {
+                'status': 'success',
+                'analysis': response_text,
+                'model': response.model,
+                'article_count': len(articles),
+                'usage': {
+                    'prompt_tokens': response.usage.prompt_tokens,
+                    'completion_tokens': response.usage.completion_tokens,
+                    'total_tokens': response.usage.total_tokens
+                },
+                'raw_response': {
+                    'id': response.id,
+                    'finish_reason': response.choices[0].finish_reason
+                }
+            }
+
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': str(e),
+                'analysis': None
+            }
+
 
 def analyze_with_gpt(
     system_prompt: str,

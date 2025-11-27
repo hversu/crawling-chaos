@@ -196,13 +196,51 @@ class JobHandler:
             schedule.every(frequency).minutes.do(self.execute_job, job_id=job_id)
             print(f"Scheduled job {job_id} ({job['name']}) to run every {frequency} minutes")
 
-    def start_scheduler(self):
-        """Start the job scheduler in a background thread"""
+    def start_scheduler(self, run_immediately: bool = True):
+        """
+        Start the job scheduler in a background thread
+
+        Args:
+            run_immediately: If True, runs all jobs once immediately on startup
+        """
         if self.running:
             return {'status': 'error', 'message': 'Scheduler already running'}
 
         self.running = True
+
+        # Check if there are any jobs, if not, create a default one
+        jobs = self.db.get_active_jobs()
+        if len(jobs) == 0:
+            print("No jobs found. Creating default job from template...")
+            try:
+                template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'news_analysis_job.json')
+                with open(template_path, 'r') as f:
+                    template = json.load(f)
+
+                # Remove description field as it's not in the database schema
+                if 'description' in template:
+                    del template['description']
+
+                result = self.create_job(template)
+                if result['status'] == 'success':
+                    print(f"Created default job with ID: {result['job_id']}")
+                    jobs = self.db.get_active_jobs()  # Refresh jobs list
+                else:
+                    print(f"Failed to create default job: {result.get('message')}")
+            except Exception as e:
+                print(f"Error creating default job: {e}")
+
         self.schedule_jobs()
+
+        # Run all jobs immediately on startup
+        if run_immediately:
+            jobs = self.db.get_active_jobs()
+            print(f"Running {len(jobs)} jobs immediately on startup...")
+            for job in jobs:
+                try:
+                    self.execute_job(job['id'])
+                except Exception as e:
+                    print(f"Error running job {job['id']} on startup: {e}")
 
         def run_scheduler():
             while self.running:

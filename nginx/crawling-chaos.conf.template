@@ -1,0 +1,185 @@
+# Nginx configuration for Crawling Chaos
+# This template is designed for systems hosting multiple domains
+#
+# Usage:
+# 1. Copy this file to /etc/nginx/sites-available/crawling-chaos.conf
+# 2. Replace DOMAIN_NAME with your actual domain
+# 3. Update SSL certificate paths if using HTTPS
+# 4. Create symlink: ln -s /etc/nginx/sites-available/crawling-chaos.conf /etc/nginx/sites-enabled/
+# 5. Test config: nginx -t
+# 6. Reload nginx: systemctl reload nginx
+
+# Upstream definition for Flask API
+upstream crawling_chaos_api {
+    server localhost:5000;
+    # If running in Docker on same host, use:
+    # server 127.0.0.1:5000;
+
+    # For load balancing across multiple instances:
+    # server localhost:5000;
+    # server localhost:5001;
+    # server localhost:5002;
+
+    keepalive 32;
+}
+
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/s;
+
+# HTTP Server Block - Redirect to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name DOMAIN_NAME;  # e.g., news.example.com or crawling.example.com
+
+    # Let's Encrypt ACME challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    # Redirect all HTTP to HTTPS
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS Server Block
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name DOMAIN_NAME;  # e.g., news.example.com
+
+    # SSL Certificate Configuration
+    # Replace with your actual certificate paths
+    ssl_certificate /etc/letsencrypt/live/DOMAIN_NAME/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/DOMAIN_NAME/privkey.pem;
+
+    # SSL Configuration (Modern, Secure)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # Security Headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; font-src 'self' data:;" always;
+
+    # Logging
+    access_log /var/log/nginx/crawling-chaos-access.log;
+    error_log /var/log/nginx/crawling-chaos-error.log warn;
+
+    # Max upload size
+    client_max_body_size 10M;
+
+    # Compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
+
+    # Root location - Serve frontend
+    location / {
+        limit_req zone=general_limit burst=20 nodelay;
+
+        proxy_pass http://crawling_chaos_api;
+        proxy_http_version 1.1;
+
+        # Proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # Buffering
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+        proxy_busy_buffers_size 8k;
+    }
+
+    # API endpoints - with rate limiting
+    location /api/ {
+        limit_req zone=api_limit burst=5 nodelay;
+
+        proxy_pass http://crawling_chaos_api;
+        proxy_http_version 1.1;
+
+        # Proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_set_header Connection "";
+
+        # Timeouts (longer for API operations)
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 90s;
+        proxy_read_timeout 90s;
+
+        # Disable buffering for API responses
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # Health check endpoint - no rate limiting
+    location /api/health {
+        limit_req zone=api_limit burst=10 nodelay;
+
+        proxy_pass http://crawling_chaos_api;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Short timeouts for health checks
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 5s;
+        proxy_read_timeout 5s;
+
+        access_log off;
+    }
+
+    # Static files caching (if served separately)
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://crawling_chaos_api;
+
+        # Cache static files
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Deny access to hidden files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Deny access to sensitive files
+    location ~ /\.(env|git|gitignore|dockerignore) {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}

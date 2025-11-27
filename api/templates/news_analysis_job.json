@@ -1,0 +1,11 @@
+{
+  "name": "AI News Analysis - Default Template",
+  "description": "Collects Google News and analyzes with both Claude and GPT",
+  "google_search_query": "artificial intelligence",
+  "claude_sys_prompt": "You are a professional news analyst. Analyze the following news article and provide insights about its significance, potential impact, and key takeaways.",
+  "claude_user_prompt": "Article Title: {title}\n\nSummary: {summary}\n\nSource: {source}\nURL: {url}\n\nProvide a concise analysis of this news article, focusing on its importance and implications.",
+  "gpt_sys_prompt": "You are an expert news commentator. Provide thoughtful analysis of news articles with a focus on broader context and trends.",
+  "gpt_user_prompt": "Article Title: {title}\n\nSummary: {summary}\n\nSource: {source}\nURL: {url}\n\nAnalyze this article and explain its relevance in the current news landscape.",
+  "frequency_minutes": 60,
+  "is_active": true
+}

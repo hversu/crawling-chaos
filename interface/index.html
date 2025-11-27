@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawling Chaos - News Analysis Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Crawling Chaos</h1>
+        <p class="subtitle">AI-Powered News Analysis Dashboard</p>
+        <button id="refreshBtn" class="refresh-btn">Refresh Data</button>
+    </header>
+
+    <main id="dashboard">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading data...</p>
+        </div>
+
+        <div id="gridContainer" class="grid-container">
+            <!-- Grid will be populated dynamically -->
+        </div>
+    </main>
+
+    <footer>
+        <p>Last updated: <span id="lastUpdate">Never</span></p>
+        <p class="status">Status: <span id="status">Ready</span></p>
+    </footer>
+
+    <script src="panel_populator.js"></script>
+</body>
+</html>

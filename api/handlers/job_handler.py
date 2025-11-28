@@ -122,51 +122,79 @@ class JobHandler:
             if job.get('claude_sys_prompt') and self.claude_handler and articles:
                 print(f"  Running Claude batch analysis on {len(articles)} articles...")
 
-                # Use batch analysis to process all articles together
-                claude_result = self.claude_handler.analyze_batch(
-                    system_prompt=job['claude_sys_prompt'],
-                    articles=articles,
-                    user_prompt_template=job['claude_user_prompt']
-                )
-
-                if claude_result['status'] == 'success':
-                    # Save the batch analysis result
-                    # Use the first article_id as the primary reference
-                    self.db.save_claude_analysis(
-                        job_id=job_id,
-                        news_result_id=article_ids[0] if article_ids else None,
-                        analysis_text=claude_result['analysis'],
-                        raw_response=claude_result.get('raw_response', {})
+                try:
+                    # Use batch analysis to process all articles together
+                    claude_result = self.claude_handler.analyze_batch(
+                        system_prompt=job['claude_sys_prompt'],
+                        articles=articles,
+                        user_prompt_template=job['claude_user_prompt']
                     )
-                    results['claude_analyses'] = 1
-                    print(f"  Completed Claude batch analysis")
-                else:
-                    results['errors'].append(f"Claude batch analysis failed: {claude_result.get('error')}")
+
+                    print(f"  Claude result status: {claude_result.get('status')}")
+
+                    if claude_result['status'] == 'success':
+                        # Save the batch analysis result
+                        # Use the first article_id as the primary reference
+                        analysis_id = self.db.save_claude_analysis(
+                            job_id=job_id,
+                            news_result_id=article_ids[0] if article_ids else None,
+                            analysis_text=claude_result['analysis'],
+                            raw_response=claude_result.get('raw_response', {})
+                        )
+                        if analysis_id:
+                            results['claude_analyses'] = 1
+                            print(f"  Completed Claude batch analysis (ID: {analysis_id})")
+                        else:
+                            error_msg = "Failed to save Claude analysis to database"
+                            print(f"  ERROR: {error_msg}")
+                            results['errors'].append(error_msg)
+                    else:
+                        error_msg = f"Claude batch analysis failed: {claude_result.get('error')}"
+                        print(f"  ERROR: {error_msg}")
+                        results['errors'].append(error_msg)
+                except Exception as e:
+                    error_msg = f"Claude analysis exception: {str(e)}"
+                    print(f"  ERROR: {error_msg}")
+                    results['errors'].append(error_msg)
 
             # Step 4: Run GPT batch analysis if configured
             if job.get('gpt_sys_prompt') and self.gpt_handler and articles:
                 print(f"  Running GPT batch analysis on {len(articles)} articles...")
 
-                # Use batch analysis to process all articles together
-                gpt_result = self.gpt_handler.analyze_batch(
-                    system_prompt=job['gpt_sys_prompt'],
-                    articles=articles,
-                    user_prompt_template=job['gpt_user_prompt']
-                )
-
-                if gpt_result['status'] == 'success':
-                    # Save the batch analysis result
-                    # Use the first article_id as the primary reference
-                    self.db.save_gpt_analysis(
-                        job_id=job_id,
-                        news_result_id=article_ids[0] if article_ids else None,
-                        analysis_text=gpt_result['analysis'],
-                        raw_response=gpt_result.get('raw_response', {})
+                try:
+                    # Use batch analysis to process all articles together
+                    gpt_result = self.gpt_handler.analyze_batch(
+                        system_prompt=job['gpt_sys_prompt'],
+                        articles=articles,
+                        user_prompt_template=job['gpt_user_prompt']
                     )
-                    results['gpt_analyses'] = 1
-                    print(f"  Completed GPT batch analysis")
-                else:
-                    results['errors'].append(f"GPT batch analysis failed: {gpt_result.get('error')}")
+
+                    print(f"  GPT result status: {gpt_result.get('status')}")
+
+                    if gpt_result['status'] == 'success':
+                        # Save the batch analysis result
+                        # Use the first article_id as the primary reference
+                        analysis_id = self.db.save_gpt_analysis(
+                            job_id=job_id,
+                            news_result_id=article_ids[0] if article_ids else None,
+                            analysis_text=gpt_result['analysis'],
+                            raw_response=gpt_result.get('raw_response', {})
+                        )
+                        if analysis_id:
+                            results['gpt_analyses'] = 1
+                            print(f"  Completed GPT batch analysis (ID: {analysis_id})")
+                        else:
+                            error_msg = "Failed to save GPT analysis to database"
+                            print(f"  ERROR: {error_msg}")
+                            results['errors'].append(error_msg)
+                    else:
+                        error_msg = f"GPT batch analysis failed: {gpt_result.get('error')}"
+                        print(f"  ERROR: {error_msg}")
+                        results['errors'].append(error_msg)
+                except Exception as e:
+                    error_msg = f"GPT analysis exception: {str(e)}"
+                    print(f"  ERROR: {error_msg}")
+                    results['errors'].append(error_msg)
 
             # Update job last run time
             self.db.update_job_last_run(job_id)

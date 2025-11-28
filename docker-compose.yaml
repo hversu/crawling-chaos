@@ -6,9 +6,9 @@ services:
     image: postgres:15-alpine
     container_name: crawling-chaos-db
     environment:
-      POSTGRES_DB: crawling_chaos
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-crawling_chaos}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -16,7 +16,7 @@ services:
       # Bind to localhost only - not accessible from external networks
       - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,11 +31,11 @@ services:
     container_name: crawling-chaos-api
     environment:
       DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: crawling_chaos
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      API_PORT: 5000
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-crawling_chaos}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      API_PORT: ${API_PORT:-5000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:

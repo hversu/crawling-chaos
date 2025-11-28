@@ -88,7 +88,7 @@ class GPTHandler:
         articles: list,
         user_prompt_template: str,
         model: str = None,
-        max_tokens: int = 8192,
+        max_tokens: int = 4096,
         temperature: float = 0.7
     ) -> Dict[str, Any]:
         """

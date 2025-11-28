@@ -23,7 +23,7 @@ class ClaudeHandler:
             raise ValueError("Anthropic API key not provided")
 
         self.client = Anthropic(api_key=self.api_key)
-        self.default_model = "claude-3-5-sonnet-20241022"
+        self.default_model = "claude-3-5-sonnet-20240620"
 
     def analyze(
         self,

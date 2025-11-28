@@ -70,26 +70,45 @@ class DatabaseHandler:
 
     # Job Management
     def create_job(self, job_config: Dict[str, Any]) -> Optional[int]:
-        """Create a new job"""
+        """Create a new job (supports both template-based and legacy formats)"""
         try:
             with self.conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO jobs (
-                        name, google_search_query, claude_sys_prompt,
-                        claude_user_prompt, gpt_sys_prompt, gpt_user_prompt,
-                        frequency_minutes, is_active
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (
-                    job_config.get('name'),
-                    job_config.get('google_search_query'),
-                    job_config.get('claude_sys_prompt'),
-                    job_config.get('claude_user_prompt'),
-                    job_config.get('gpt_sys_prompt'),
-                    job_config.get('gpt_user_prompt'),
-                    job_config.get('frequency_minutes'),
-                    job_config.get('is_active', True)
-                ))
+                # Check if this is a template-based job or legacy job
+                if 'template' in job_config:
+                    # New template-based job
+                    cur.execute("""
+                        INSERT INTO jobs (
+                            name, template_name, parameters,
+                            frequency_minutes, is_active
+                        ) VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (
+                        job_config.get('name'),
+                        job_config.get('template'),
+                        Json(job_config.get('parameters', {})),
+                        job_config.get('frequency_minutes'),
+                        job_config.get('is_active', True)
+                    ))
+                else:
+                    # Legacy job with embedded prompts
+                    cur.execute("""
+                        INSERT INTO jobs (
+                            name, google_search_query, claude_sys_prompt,
+                            claude_user_prompt, gpt_sys_prompt, gpt_user_prompt,
+                            frequency_minutes, is_active
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (
+                        job_config.get('name'),
+                        job_config.get('google_search_query'),
+                        job_config.get('claude_sys_prompt'),
+                        job_config.get('claude_user_prompt'),
+                        job_config.get('gpt_sys_prompt'),
+                        job_config.get('gpt_user_prompt'),
+                        job_config.get('frequency_minutes'),
+                        job_config.get('is_active', True)
+                    ))
+
                 job_id = cur.fetchone()[0]
                 self.conn.commit()
                 return job_id

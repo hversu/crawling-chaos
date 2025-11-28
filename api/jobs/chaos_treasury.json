@@ -1,0 +1,10 @@
+{
+  "name": "Chaos Treasury",
+  "template": "news_analysis",
+  "parameters": {
+    "google_search_query": "merger OR acquisition OR stock market volatility OR economic downturn OR earnings report",
+    "days_to_lookback": 7
+  },
+  "frequency_minutes": 60,
+  "is_active": true
+}

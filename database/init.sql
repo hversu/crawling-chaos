@@ -3,7 +3,9 @@
 CREATE TABLE IF NOT EXISTS jobs (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    google_search_query TEXT NOT NULL,
+    template_name VARCHAR(255),
+    parameters JSONB,
+    google_search_query TEXT,
     claude_sys_prompt TEXT,
     claude_user_prompt TEXT,
     gpt_sys_prompt TEXT,

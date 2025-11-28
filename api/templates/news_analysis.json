@@ -1,0 +1,26 @@
+{
+  "name": "news_analysis",
+  "description": "Collect news articles and analyze with Claude and GPT",
+  "workflow": {
+    "collectors": [
+      {
+        "type": "google_news",
+        "config": {
+          "max_results": 10
+        }
+      }
+    ],
+    "analyzers": [
+      {
+        "type": "claude",
+        "system_prompt": "You are a concise intelligence analyst. Provide BLUF (Bottom Line Up Front) analysis with predictive assessments. Be direct and brief.",
+        "user_prompt_template": "Analyze these {article_count} articles using strict BLUF format:\n\n**BLUF:** [1-2 sentence bottom line]\n\n**KEY DEVELOPMENTS:**\n- [3-5 bullet points, max 15 words each]\n\n**PREDICTIONS:** (next 30-90 days)\n1. [Prediction] - Probability: [%]\n2. [Prediction] - Probability: [%]\n3. [Prediction] - Probability: [%]\n\n**IMPLICATIONS:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nKeep total response under 250 words. Be direct and actionable."
+      },
+      {
+        "type": "gpt",
+        "system_prompt": "You are a concise strategic analyst. Provide BLUF-style intelligence briefs with probabilistic forecasts. No fluff.",
+        "user_prompt_template": "Brief these {article_count} articles in BLUF format:\n\n**BLUF:** [1-2 sentence summary]\n\n**CRITICAL POINTS:**\n- [3-5 bullets, max 15 words each]\n\n**FORECAST:** (30-90 day outlook)\n1. [Specific prediction] - Confidence: [%]\n2. [Specific prediction] - Confidence: [%]\n3. [Specific prediction] - Confidence: [%]\n\n**STRATEGIC IMPACT:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nLimit to 250 words total. Be specific and actionable."
+      }
+    ]
+  }
+}

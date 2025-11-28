@@ -14,6 +14,7 @@ from collectors.google_news import GoogleNewsCollector
 from handlers.claude_handler import ClaudeHandler
 from handlers.gpt_handler import GPTHandler
 from handlers.db_handler import DatabaseHandler
+from handlers.template_handler import TemplateHandler
 
 
 class JobHandler:
@@ -24,6 +25,7 @@ class JobHandler:
         self.db = DatabaseHandler()
         self.db.connect()
 
+        self.template_handler = TemplateHandler()
         self.google_collector = GoogleNewsCollector()
 
         # Initialize AI handlers (with error handling for missing keys)
@@ -85,6 +87,132 @@ class JobHandler:
         if not job:
             return {'status': 'error', 'message': 'Job not found'}
 
+        # Check if job uses template (new style) or direct config (old style)
+        if job.get('template_name'):
+            return self._execute_templated_job(job_id, job)
+        else:
+            return self._execute_legacy_job(job_id, job)
+
+    def _execute_templated_job(self, job_id: int, job: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a job using a template
+
+        Args:
+            job_id: Job ID
+            job: Job configuration with template_name and parameters
+
+        Returns:
+            Execution result dictionary
+        """
+        print(f"  Using template: {job['template_name']}")
+
+        # Load template
+        template = self.template_handler.load_template(job['template_name'])
+        if not template:
+            return {
+                'status': 'error',
+                'message': f"Template not found: {job['template_name']}"
+            }
+
+        results = {
+            'job_id': job_id,
+            'started_at': datetime.utcnow().isoformat(),
+            'news_collected': 0,
+            'claude_analyses': 0,
+            'gpt_analyses': 0,
+            'errors': []
+        }
+
+        try:
+            # Get job parameters
+            parameters = job.get('parameters', {})
+
+            # Step 1: Run collectors
+            articles = []
+            collectors = self.template_handler.get_collectors(template)
+
+            for collector_config in collectors:
+                collector_type = collector_config.get('type')
+
+                if collector_type == 'google_news':
+                    query = parameters.get('google_search_query')
+                    days_to_lookback = parameters.get('days_to_lookback')
+                    max_results = collector_config.get('config', {}).get('max_results', 10)
+
+                    print(f"  Collecting news for query: {query}")
+                    if days_to_lookback:
+                        print(f"  Looking back {days_to_lookback} days")
+
+                    news_result = self.google_collector.collect(
+                        query=query,
+                        max_results=max_results,
+                        days_to_lookback=days_to_lookback
+                    )
+
+                    if news_result['status'] == 'success':
+                        articles.extend(news_result.get('articles', []))
+                    else:
+                        results['errors'].append(f"News collection failed: {news_result.get('error')}")
+
+            results['news_collected'] = len(articles)
+
+            # Save articles to database
+            if articles:
+                article_ids = self.db.save_news_results(job_id, articles)
+                print(f"  Saved {len(article_ids)} articles")
+
+                # Step 2: Run analyzers
+                analyzers = self.template_handler.get_analyzers(template)
+
+                for analyzer_config in analyzers:
+                    analyzer_type = analyzer_config.get('type')
+
+                    if analyzer_type == 'claude' and self.claude_handler:
+                        self._run_claude_analysis(
+                            job_id=job_id,
+                            articles=articles,
+                            article_ids=article_ids,
+                            system_prompt=analyzer_config.get('system_prompt'),
+                            user_prompt_template=analyzer_config.get('user_prompt_template'),
+                            results=results
+                        )
+
+                    elif analyzer_type == 'gpt' and self.gpt_handler:
+                        self._run_gpt_analysis(
+                            job_id=job_id,
+                            articles=articles,
+                            article_ids=article_ids,
+                            system_prompt=analyzer_config.get('system_prompt'),
+                            user_prompt_template=analyzer_config.get('user_prompt_template'),
+                            results=results
+                        )
+
+            # Update job last run time
+            self.db.update_job_last_run(job_id)
+
+            results['status'] = 'success'
+            results['completed_at'] = datetime.utcnow().isoformat()
+
+        except Exception as e:
+            results['status'] = 'error'
+            results['errors'].append(str(e))
+            print(f"  Job execution error: {e}")
+
+        return results
+
+    def _execute_legacy_job(self, job_id: int, job: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a job using legacy direct configuration (backward compatibility)
+
+        Args:
+            job_id: Job ID
+            job: Job configuration with embedded prompts
+
+        Returns:
+            Execution result dictionary
+        """
+        print(f"  Using legacy job configuration")
+
         results = {
             'job_id': job_id,
             'started_at': datetime.utcnow().isoformat(),
@@ -120,81 +248,25 @@ class JobHandler:
 
             # Step 3: Run Claude batch analysis if configured
             if job.get('claude_sys_prompt') and self.claude_handler and articles:
-                print(f"  Running Claude batch analysis on {len(articles)} articles...")
-
-                try:
-                    # Use batch analysis to process all articles together
-                    claude_result = self.claude_handler.analyze_batch(
-                        system_prompt=job['claude_sys_prompt'],
-                        articles=articles,
-                        user_prompt_template=job['claude_user_prompt']
-                    )
-
-                    print(f"  Claude result status: {claude_result.get('status')}")
-
-                    if claude_result['status'] == 'success':
-                        # Save the batch analysis result
-                        # Use the first article_id as the primary reference
-                        analysis_id = self.db.save_claude_analysis(
-                            job_id=job_id,
-                            news_result_id=article_ids[0] if article_ids else None,
-                            analysis_text=claude_result['analysis'],
-                            raw_response=claude_result.get('raw_response', {})
-                        )
-                        if analysis_id:
-                            results['claude_analyses'] = 1
-                            print(f"  Completed Claude batch analysis (ID: {analysis_id})")
-                        else:
-                            error_msg = "Failed to save Claude analysis to database"
-                            print(f"  ERROR: {error_msg}")
-                            results['errors'].append(error_msg)
-                    else:
-                        error_msg = f"Claude batch analysis failed: {claude_result.get('error')}"
-                        print(f"  ERROR: {error_msg}")
-                        results['errors'].append(error_msg)
-                except Exception as e:
-                    error_msg = f"Claude analysis exception: {str(e)}"
-                    print(f"  ERROR: {error_msg}")
-                    results['errors'].append(error_msg)
+                self._run_claude_analysis(
+                    job_id=job_id,
+                    articles=articles,
+                    article_ids=article_ids,
+                    system_prompt=job['claude_sys_prompt'],
+                    user_prompt_template=job['claude_user_prompt'],
+                    results=results
+                )
 
             # Step 4: Run GPT batch analysis if configured
             if job.get('gpt_sys_prompt') and self.gpt_handler and articles:
-                print(f"  Running GPT batch analysis on {len(articles)} articles...")
-
-                try:
-                    # Use batch analysis to process all articles together
-                    gpt_result = self.gpt_handler.analyze_batch(
-                        system_prompt=job['gpt_sys_prompt'],
-                        articles=articles,
-                        user_prompt_template=job['gpt_user_prompt']
-                    )
-
-                    print(f"  GPT result status: {gpt_result.get('status')}")
-
-                    if gpt_result['status'] == 'success':
-                        # Save the batch analysis result
-                        # Use the first article_id as the primary reference
-                        analysis_id = self.db.save_gpt_analysis(
-                            job_id=job_id,
-                            news_result_id=article_ids[0] if article_ids else None,
-                            analysis_text=gpt_result['analysis'],
-                            raw_response=gpt_result.get('raw_response', {})
-                        )
-                        if analysis_id:
-                            results['gpt_analyses'] = 1
-                            print(f"  Completed GPT batch analysis (ID: {analysis_id})")
-                        else:
-                            error_msg = "Failed to save GPT analysis to database"
-                            print(f"  ERROR: {error_msg}")
-                            results['errors'].append(error_msg)
-                    else:
-                        error_msg = f"GPT batch analysis failed: {gpt_result.get('error')}"
-                        print(f"  ERROR: {error_msg}")
-                        results['errors'].append(error_msg)
-                except Exception as e:
-                    error_msg = f"GPT analysis exception: {str(e)}"
-                    print(f"  ERROR: {error_msg}")
-                    results['errors'].append(error_msg)
+                self._run_gpt_analysis(
+                    job_id=job_id,
+                    articles=articles,
+                    article_ids=article_ids,
+                    system_prompt=job['gpt_sys_prompt'],
+                    user_prompt_template=job['gpt_user_prompt'],
+                    results=results
+                )
 
             # Update job last run time
             self.db.update_job_last_run(job_id)
@@ -208,6 +280,114 @@ class JobHandler:
             print(f"  Job execution error: {e}")
 
         return results
+
+    def _run_claude_analysis(
+        self,
+        job_id: int,
+        articles: List[Dict],
+        article_ids: List[int],
+        system_prompt: str,
+        user_prompt_template: str,
+        results: Dict[str, Any]
+    ):
+        """
+        Run Claude analysis on articles
+
+        Args:
+            job_id: Job ID
+            articles: List of article dictionaries
+            article_ids: List of saved article IDs
+            system_prompt: System prompt for Claude
+            user_prompt_template: User prompt template
+            results: Results dictionary to update
+        """
+        print(f"  Running Claude batch analysis on {len(articles)} articles...")
+
+        try:
+            claude_result = self.claude_handler.analyze_batch(
+                system_prompt=system_prompt,
+                articles=articles,
+                user_prompt_template=user_prompt_template
+            )
+
+            print(f"  Claude result status: {claude_result.get('status')}")
+
+            if claude_result['status'] == 'success':
+                analysis_id = self.db.save_claude_analysis(
+                    job_id=job_id,
+                    news_result_id=article_ids[0] if article_ids else None,
+                    analysis_text=claude_result['analysis'],
+                    raw_response=claude_result.get('raw_response', {})
+                )
+                if analysis_id:
+                    results['claude_analyses'] = 1
+                    print(f"  Completed Claude batch analysis (ID: {analysis_id})")
+                else:
+                    error_msg = "Failed to save Claude analysis to database"
+                    print(f"  ERROR: {error_msg}")
+                    results['errors'].append(error_msg)
+            else:
+                error_msg = f"Claude batch analysis failed: {claude_result.get('error')}"
+                print(f"  ERROR: {error_msg}")
+                results['errors'].append(error_msg)
+        except Exception as e:
+            error_msg = f"Claude analysis exception: {str(e)}"
+            print(f"  ERROR: {error_msg}")
+            results['errors'].append(error_msg)
+
+    def _run_gpt_analysis(
+        self,
+        job_id: int,
+        articles: List[Dict],
+        article_ids: List[int],
+        system_prompt: str,
+        user_prompt_template: str,
+        results: Dict[str, Any]
+    ):
+        """
+        Run GPT analysis on articles
+
+        Args:
+            job_id: Job ID
+            articles: List of article dictionaries
+            article_ids: List of saved article IDs
+            system_prompt: System prompt for GPT
+            user_prompt_template: User prompt template
+            results: Results dictionary to update
+        """
+        print(f"  Running GPT batch analysis on {len(articles)} articles...")
+
+        try:
+            gpt_result = self.gpt_handler.analyze_batch(
+                system_prompt=system_prompt,
+                articles=articles,
+                user_prompt_template=user_prompt_template
+            )
+
+            print(f"  GPT result status: {gpt_result.get('status')}")
+
+            if gpt_result['status'] == 'success':
+                analysis_id = self.db.save_gpt_analysis(
+                    job_id=job_id,
+                    news_result_id=article_ids[0] if article_ids else None,
+                    analysis_text=gpt_result['analysis'],
+                    raw_response=gpt_result.get('raw_response', {})
+                )
+                if analysis_id:
+                    results['gpt_analyses'] = 1
+                    print(f"  Completed GPT batch analysis (ID: {analysis_id})")
+                else:
+                    error_msg = "Failed to save GPT analysis to database"
+                    print(f"  ERROR: {error_msg}")
+                    results['errors'].append(error_msg)
+            else:
+                error_msg = f"GPT batch analysis failed: {gpt_result.get('error')}"
+                print(f"  ERROR: {error_msg}")
+                results['errors'].append(error_msg)
+        except Exception as e:
+            error_msg = f"GPT analysis exception: {str(e)}"
+            print(f"  ERROR: {error_msg}")
+            results['errors'].append(error_msg)
 
     def schedule_jobs(self):
         """Schedule all active jobs based on their frequency"""

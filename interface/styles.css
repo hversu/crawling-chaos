@@ -350,6 +350,29 @@ footer p {
     }
 }
 
+/* Job Header */
+.job-header {
+    grid-column: 1 / -1;
+    background: var(--accent-color);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--highlight-color);
+}
+
+.job-header:first-child {
+    margin-top: 0;
+}
+
+.job-header h2 {
+    color: var(--text-color);
+    font-size: 1.3rem;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
 /* Empty State */
 .empty-state {
     grid-column: 1 / -1;

@@ -206,9 +206,11 @@ class DatabaseHandler:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, title, summary, url, publish_date, collected_at
-                    FROM news_results
-                    ORDER BY collected_at DESC
+                    SELECT nr.id, nr.job_id, nr.title, nr.summary, nr.url,
+                           nr.publish_date, nr.collected_at, j.name as job_name
+                    FROM news_results nr
+                    JOIN jobs j ON nr.job_id = j.id
+                    ORDER BY nr.collected_at DESC
                     LIMIT %s
                 """, (limit,))
                 return [dict(row) for row in cur.fetchall()]
@@ -221,10 +223,10 @@ class DatabaseHandler:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT ca.id, ca.news_result_id, ca.analysis_text,
-                           ca.created_at, nr.title as news_title
+                    SELECT ca.id, ca.job_id, ca.news_result_id, ca.analysis_text,
+                           ca.created_at, j.name as job_name
                     FROM claude_analysis ca
-                    JOIN news_results nr ON ca.news_result_id = nr.id
+                    JOIN jobs j ON ca.job_id = j.id
                     ORDER BY ca.created_at DESC
                     LIMIT %s
                 """, (limit,))
@@ -238,10 +240,10 @@ class DatabaseHandler:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT ga.id, ga.news_result_id, ga.analysis_text,
-                           ga.created_at, nr.title as news_title
+                    SELECT ga.id, ga.job_id, ga.news_result_id, ga.analysis_text,
+                           ga.created_at, j.name as job_name
                     FROM gpt_analysis ga
-                    JOIN news_results nr ON ga.news_result_id = nr.id
+                    JOIN jobs j ON ga.job_id = j.id
                     ORDER BY ga.created_at DESC
                     LIMIT %s
                 """, (limit,))

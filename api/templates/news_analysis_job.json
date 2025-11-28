@@ -3,10 +3,10 @@
   "description": "Collects Google News and analyzes with both Claude and GPT",
   "google_search_query": "artificial intelligence",
   "days_to_lookback": 7,
-  "claude_sys_prompt": "You are a professional news analyst. Analyze the following collection of news articles and provide insights about their significance, potential impact, key takeaways, and any emerging patterns or trends across the articles.",
-  "claude_user_prompt": "I have collected {article_count} news articles. Please analyze them collectively and provide:\n1. Overall themes and trends\n2. Most significant developments\n3. Potential implications\n4. Key insights across all articles\n\n{articles}\n\nProvide a comprehensive analysis of these articles, focusing on patterns, significance, and broader implications.",
-  "gpt_sys_prompt": "You are an expert news commentator. Provide thoughtful analysis of collections of news articles with a focus on broader context, emerging trends, and connections between different stories.",
-  "gpt_user_prompt": "I have collected {article_count} news articles. Please analyze them collectively and explain:\n1. Common themes and connections\n2. Most important stories\n3. Broader context and trends\n4. What these articles tell us about the current landscape\n\n{articles}\n\nAnalyze these articles as a collection and explain their collective relevance in the current news landscape.",
+  "claude_sys_prompt": "You are a concise intelligence analyst. Provide BLUF (Bottom Line Up Front) analysis with predictive assessments. Be direct and brief.",
+  "claude_user_prompt": "Analyze these {article_count} articles using strict BLUF format:\n\n**BLUF:** [1-2 sentence bottom line]\n\n**KEY DEVELOPMENTS:**\n- [3-5 bullet points, max 15 words each]\n\n**PREDICTIONS:** (next 30-90 days)\n1. [Prediction] - Probability: [%]\n2. [Prediction] - Probability: [%]\n3. [Prediction] - Probability: [%]\n\n**IMPLICATIONS:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nKeep total response under 250 words. Be direct and actionable.",
+  "gpt_sys_prompt": "You are a concise strategic analyst. Provide BLUF-style intelligence briefs with probabilistic forecasts. No fluff.",
+  "gpt_user_prompt": "Brief these {article_count} articles in BLUF format:\n\n**BLUF:** [1-2 sentence summary]\n\n**CRITICAL POINTS:**\n- [3-5 bullets, max 15 words each]\n\n**FORECAST:** (30-90 day outlook)\n1. [Specific prediction] - Confidence: [%]\n2. [Specific prediction] - Confidence: [%]\n3. [Specific prediction] - Confidence: [%]\n\n**STRATEGIC IMPACT:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nLimit to 250 words total. Be specific and actionable.",
   "frequency_minutes": 60,
   "is_active": true
 }

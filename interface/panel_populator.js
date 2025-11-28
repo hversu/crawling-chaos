@@ -53,9 +53,9 @@ async function fetchAllData() {
 }
 
 /**
- * Create NEWS list panel showing all articles
+ * Create NEWS list panel showing articles for a specific job
  */
-function createNewsListPanel() {
+function createNewsListPanel(newsItems, jobName) {
     const panel = document.createElement('div');
     panel.className = 'panel news';
 
@@ -68,7 +68,7 @@ function createNewsListPanel() {
 
     const count = document.createElement('span');
     count.className = 'panel-count';
-    count.textContent = `${allData.news.length} articles`;
+    count.textContent = `${newsItems.length} articles`;
 
     header.appendChild(typeLabel);
     header.appendChild(count);
@@ -76,7 +76,7 @@ function createNewsListPanel() {
     const content = document.createElement('div');
     content.className = 'panel-content';
 
-    if (allData.news.length === 0) {
+    if (newsItems.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'empty-message';
         empty.textContent = 'No news articles collected yet';
@@ -85,7 +85,7 @@ function createNewsListPanel() {
         const list = document.createElement('div');
         list.className = 'news-list';
 
-        allData.news.forEach(article => {
+        newsItems.forEach(article => {
             const item = document.createElement('div');
             item.className = 'news-item';
 
@@ -158,7 +158,7 @@ function createAnalysisPanel(type, data) {
 }
 
 /**
- * Create 3-column layout: NEWS | CLAUDE | GPT
+ * Create job-grouped layout: Each job gets its own row of NEWS | CLAUDE | GPT
  */
 function createGrid() {
     const container = document.getElementById('gridContainer');
@@ -179,17 +179,80 @@ function createGrid() {
         return;
     }
 
-    // Create NEWS panel (all articles in one panel)
-    const newsPanel = createNewsListPanel();
-    container.appendChild(newsPanel);
+    // Group all data by job_id
+    const jobGroups = groupDataByJob();
 
-    // Create CLAUDE analysis panel
-    const claudePanel = createAnalysisPanel('claude', allData.claude);
-    container.appendChild(claudePanel);
+    // Create a row for each job
+    for (const [jobId, jobData] of Object.entries(jobGroups)) {
+        // Job header
+        const jobHeader = document.createElement('div');
+        jobHeader.className = 'job-header';
+        jobHeader.innerHTML = `<h2>${jobData.jobName}</h2>`;
+        container.appendChild(jobHeader);
 
-    // Create GPT analysis panel
-    const gptPanel = createAnalysisPanel('gpt', allData.gpt);
-    container.appendChild(gptPanel);
+        // Create NEWS panel for this job
+        const newsPanel = createNewsListPanel(jobData.news, jobData.jobName);
+        container.appendChild(newsPanel);
+
+        // Create CLAUDE analysis panel for this job
+        const claudePanel = createAnalysisPanel('claude', jobData.claude);
+        container.appendChild(claudePanel);
+
+        // Create GPT analysis panel for this job
+        const gptPanel = createAnalysisPanel('gpt', jobData.gpt);
+        container.appendChild(gptPanel);
+    }
+}
+
+/**
+ * Group all data by job_id
+ */
+function groupDataByJob() {
+    const groups = {};
+
+    // Group news by job_id
+    allData.news.forEach(item => {
+        const jobId = item.job_id;
+        if (!groups[jobId]) {
+            groups[jobId] = {
+                jobName: item.job_name || `Job ${jobId}`,
+                news: [],
+                claude: [],
+                gpt: []
+            };
+        }
+        groups[jobId].news.push(item);
+    });
+
+    // Group Claude analyses by job_id
+    allData.claude.forEach(item => {
+        const jobId = item.job_id;
+        if (!groups[jobId]) {
+            groups[jobId] = {
+                jobName: item.job_name || `Job ${jobId}`,
+                news: [],
+                claude: [],
+                gpt: []
+            };
+        }
+        groups[jobId].claude.push(item);
+    });
+
+    // Group GPT analyses by job_id
+    allData.gpt.forEach(item => {
+        const jobId = item.job_id;
+        if (!groups[jobId]) {
+            groups[jobId] = {
+                jobName: item.job_name || `Job ${jobId}`,
+                news: [],
+                claude: [],
+                gpt: []
+            };
+        }
+        groups[jobId].gpt.push(item);
+    });
+
+    return groups;
 }
 
 /**

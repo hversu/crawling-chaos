@@ -3,30 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crawling Chaos - News Analysis Dashboard</title>
+    <title>⟨ CRAWLING CHAOS ⟩</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="terminal-overlay"></div>
+
     <header>
-        <h1>Crawling Chaos</h1>
-        <p class="subtitle">AI-Powered News Analysis Dashboard</p>
-        <button id="refreshBtn" class="refresh-btn">Refresh Data</button>
+        <div class="header-content">
+            <h1 class="glitch" data-text="⟨ CRAWLING CHAOS ⟩">⟨ CRAWLING CHAOS ⟩</h1>
+            <p class="subtitle">// INTELLIGENCE SURVEILLANCE NETWORK //</p>
+        </div>
+        <button id="refreshBtn" class="cyber-btn">
+            <span>↻ SYNC</span>
+        </button>
     </header>
+
+    <nav id="tabNav" class="tab-nav">
+        <!-- Tabs will be populated dynamically -->
+    </nav>
 
     <main id="dashboard">
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Loading data...</p>
+            <p class="loading-text">ESTABLISHING CONNECTION...</p>
         </div>
 
-        <div id="gridContainer" class="grid-container">
-            <!-- Grid will be populated dynamically -->
+        <div id="tabContent" class="tab-content">
+            <!-- Tab panels will be populated dynamically -->
         </div>
     </main>
 
     <footer>
-        <p>Last updated: <span id="lastUpdate">Never</span></p>
-        <p class="status">Status: <span id="status">Ready</span></p>
+        <div class="footer-content">
+            <span class="status-indicator">
+                <span class="pulse"></span>
+                <span id="status">ONLINE</span>
+            </span>
+            <span class="divider">│</span>
+            <span>LAST SYNC: <span id="lastUpdate" class="timestamp">NEVER</span></span>
+        </div>
     </footer>
 
     <script src="panel_populator.js"></script>

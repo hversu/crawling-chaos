@@ -158,11 +158,14 @@ function createAnalysisPanel(type, data) {
 }
 
 /**
- * Create job-grouped layout: Each job gets its own row of NEWS | CLAUDE | GPT
+ * Create tabbed layout: Each job gets its own tab with 3-column grid
  */
 function createGrid() {
-    const container = document.getElementById('gridContainer');
-    container.innerHTML = '';
+    const tabNav = document.getElementById('tabNav');
+    const tabContent = document.getElementById('tabContent');
+
+    tabNav.innerHTML = '';
+    tabContent.innerHTML = '';
 
     // Check if we have any data
     const totalPanels = allData.news.length + allData.claude.length + allData.gpt.length;
@@ -171,37 +174,80 @@ function createGrid() {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
         emptyState.innerHTML = `
-            <h2>No data available</h2>
-            <p>Jobs haven't run yet or no data has been collected.</p>
+            <h2>⚠ NO DATA AVAILABLE</h2>
+            <p>Jobs haven't executed yet or no data has been collected.</p>
             <p>Try refreshing in a few moments.</p>
         `;
-        container.appendChild(emptyState);
+        tabContent.appendChild(emptyState);
+        tabContent.style.display = 'block';
         return;
     }
 
     // Group all data by job_id
     const jobGroups = groupDataByJob();
+    const jobIds = Object.keys(jobGroups);
 
-    // Create a row for each job
-    for (const [jobId, jobData] of Object.entries(jobGroups)) {
-        // Job header
-        const jobHeader = document.createElement('div');
-        jobHeader.className = 'job-header';
-        jobHeader.innerHTML = `<h2>${jobData.jobName}</h2>`;
-        container.appendChild(jobHeader);
+    // Create tabs and panels for each job
+    jobIds.forEach((jobId, index) => {
+        const jobData = jobGroups[jobId];
 
-        // Create NEWS panel for this job
+        // Create tab button
+        const tabBtn = document.createElement('button');
+        tabBtn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+        tabBtn.textContent = jobData.jobName;
+        tabBtn.dataset.jobId = jobId;
+        tabBtn.addEventListener('click', () => switchTab(jobId));
+        tabNav.appendChild(tabBtn);
+
+        // Create tab panel
+        const tabPanel = document.createElement('div');
+        tabPanel.className = 'tab-panel' + (index === 0 ? ' active' : '');
+        tabPanel.dataset.jobId = jobId;
+
+        // Create 3-column grid for this job
+        const panelGrid = document.createElement('div');
+        panelGrid.className = 'panel-grid';
+
+        // Create NEWS panel
         const newsPanel = createNewsListPanel(jobData.news, jobData.jobName);
-        container.appendChild(newsPanel);
+        panelGrid.appendChild(newsPanel);
 
-        // Create CLAUDE analysis panel for this job
+        // Create CLAUDE analysis panel
         const claudePanel = createAnalysisPanel('claude', jobData.claude);
-        container.appendChild(claudePanel);
+        panelGrid.appendChild(claudePanel);
 
-        // Create GPT analysis panel for this job
+        // Create GPT analysis panel
         const gptPanel = createAnalysisPanel('gpt', jobData.gpt);
-        container.appendChild(gptPanel);
-    }
+        panelGrid.appendChild(gptPanel);
+
+        tabPanel.appendChild(panelGrid);
+        tabContent.appendChild(tabPanel);
+    });
+
+    tabContent.style.display = 'block';
+}
+
+/**
+ * Switch between tabs
+ */
+function switchTab(jobId) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.dataset.jobId === jobId) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update tab panels
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        if (panel.dataset.jobId === jobId) {
+            panel.classList.add('active');
+        } else {
+            panel.classList.remove('active');
+        }
+    });
 }
 
 /**
@@ -294,7 +340,7 @@ function formatTimestamp(timestamp) {
 function updateStatus(message) {
     const statusEl = document.getElementById('status');
     if (statusEl) {
-        statusEl.textContent = message;
+        statusEl.textContent = message.toUpperCase();
     }
 }
 
@@ -313,14 +359,14 @@ function updateLastUpdateTime() {
  */
 function setLoading(isLoading) {
     const loadingEl = document.getElementById('loading');
-    const gridEl = document.getElementById('gridContainer');
+    const tabContent = document.getElementById('tabContent');
 
     if (isLoading) {
         loadingEl.style.display = 'block';
-        gridEl.style.display = 'none';
+        tabContent.style.display = 'none';
     } else {
         loadingEl.style.display = 'none';
-        gridEl.style.display = 'grid';
+        tabContent.style.display = 'block';
     }
 }
 
@@ -336,13 +382,14 @@ async function loadAndDisplayData() {
         createGrid();
         updateLastUpdateTime();
     } else {
-        const container = document.getElementById('gridContainer');
+        const container = document.getElementById('tabContent');
         container.innerHTML = `
             <div class="empty-state">
-                <h2>Error loading data</h2>
+                <h2>⚠ ERROR LOADING DATA</h2>
                 <p>Please check the API connection and try again.</p>
             </div>
         `;
+        container.style.display = 'block';
     }
 
     setLoading(false);

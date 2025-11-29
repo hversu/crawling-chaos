@@ -422,7 +422,7 @@ class JobHandler:
         if len(jobs) == 0:
             print("No jobs found. Creating default job from template...")
             try:
-                template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'news_analysis_job.json')
+                template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'news_analysis.json')
                 with open(template_path, 'r') as f:
                     template = json.load(f)
 

@@ -6,6 +6,6 @@
     "days_to_lookback": 3,
     "max_articles": 25
   },
-  "frequency_minutes": 60,
+  "frequency_minutes": 720,
   "is_active": true
 }

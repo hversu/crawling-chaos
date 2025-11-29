@@ -56,13 +56,18 @@ class GoogleNewsCollector:
 
             # Calculate cutoff date if days_to_lookback is specified
             cutoff_date = None
+            cutoff_date_aware = None
             if days_to_lookback is not None and days_to_lookback > 0:
                 cutoff_date = datetime.utcnow() - timedelta(days=days_to_lookback)
 
             print(f"    Feed returned {len(feed.entries)} total entries")
+            if cutoff_date:
+                print(f"    Cutoff date: {cutoff_date.isoformat()}")
 
             articles = []
             filtered_count = 0
+            date_parse_failures = 0
+
             for entry in feed.entries:
                 # Parse the article date
                 publish_date_str = self._parse_date(entry.get('published', ''))
@@ -71,16 +76,28 @@ class GoogleNewsCollector:
                 if cutoff_date:
                     try:
                         publish_date = datetime.fromisoformat(publish_date_str.replace('Z', '+00:00'))
-                        # Make cutoff_date timezone-aware if publish_date is
-                        if publish_date.tzinfo is not None and cutoff_date.tzinfo is None:
-                            cutoff_date = cutoff_date.replace(tzinfo=publish_date.tzinfo)
+
+                        # Make cutoff_date timezone-aware once
+                        if cutoff_date_aware is None and publish_date.tzinfo is not None:
+                            from datetime import timezone
+                            cutoff_date_aware = cutoff_date.replace(tzinfo=timezone.utc)
+
+                        # Use timezone-aware cutoff if available
+                        compare_cutoff = cutoff_date_aware if cutoff_date_aware else cutoff_date
+
+                        # Debug: print first few article dates
+                        if filtered_count + len(articles) < 3:
+                            print(f"    Article date: {publish_date.isoformat()}, Cutoff: {compare_cutoff.isoformat()}, Pass: {publish_date >= compare_cutoff}")
 
                         # Skip articles older than cutoff
-                        if publish_date < cutoff_date:
+                        if publish_date < compare_cutoff:
                             filtered_count += 1
                             continue
-                    except:
+                    except Exception as e:
                         # If date parsing fails, include the article
+                        date_parse_failures += 1
+                        if date_parse_failures <= 2:
+                            print(f"    Date parse error: {e} for date: {publish_date_str}")
                         pass
 
                 article = {

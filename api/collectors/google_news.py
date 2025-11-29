@@ -59,7 +59,10 @@ class GoogleNewsCollector:
             if days_to_lookback is not None and days_to_lookback > 0:
                 cutoff_date = datetime.utcnow() - timedelta(days=days_to_lookback)
 
+            print(f"    Feed returned {len(feed.entries)} total entries")
+
             articles = []
+            filtered_count = 0
             for entry in feed.entries:
                 # Parse the article date
                 publish_date_str = self._parse_date(entry.get('published', ''))
@@ -74,6 +77,7 @@ class GoogleNewsCollector:
 
                         # Skip articles older than cutoff
                         if publish_date < cutoff_date:
+                            filtered_count += 1
                             continue
                     except:
                         # If date parsing fails, include the article
@@ -91,6 +95,10 @@ class GoogleNewsCollector:
                 # Stop if we've reached max_results
                 if len(articles) >= max_results:
                     break
+
+            if days_to_lookback and filtered_count > 0:
+                print(f"    Filtered out {filtered_count} articles older than {days_to_lookback} days")
+            print(f"    Collected {len(articles)} articles")
 
             return {
                 'status': 'success',

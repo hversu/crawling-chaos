@@ -2,7 +2,7 @@
   "name": "CryptoChaosography",
   "template": "news_analysis",
   "parameters": {
-    "google_search_query": "bitcoin OR ethereum OR crypto OR blockchain OR NFT OR Web3 OR coinbase OR binance OR SEC OR ripple OR solana OR cardano OR dogecoin",
+    "google_search_query": "bitcoin OR ethereum OR crypto OR blockchain OR NFT OR Web3 OR coinbase OR binance OR solana OR cardano OR dogecoin",
     "days_to_lookback": 3,
     "max_articles": 25
   },

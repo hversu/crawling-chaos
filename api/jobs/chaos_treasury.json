@@ -1,10 +1,10 @@
 {
-  "name": "Chaos Treasury",
+  "name": "CryptoChaosography",
   "template": "news_analysis",
   "parameters": {
-    "google_search_query": "merger OR acquisition OR stock market volatility OR economic downturn OR earnings report",
-    "days_to_lookback": 14,
-    "max_articles": 15
+    "google_search_query": "cryptocurrency OR bitcoin OR ethereum OR SEC crypto OR crypto regulation OR crypto ETF OR blockchain adoption OR crypto exchange OR stablecoin OR DeFi OR institutional crypto OR crypto lawsuit OR whale activity OR crypto ban",
+    "days_to_lookback": 7,
+    "max_articles": 20
   },
   "frequency_minutes": 60,
   "is_active": true

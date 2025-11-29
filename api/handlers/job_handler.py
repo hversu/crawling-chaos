@@ -137,9 +137,10 @@ class JobHandler:
                 if collector_type == 'google_news':
                     query = parameters.get('google_search_query')
                     days_to_lookback = parameters.get('days_to_lookback')
-                    max_results = collector_config.get('config', {}).get('max_results', 10)
+                    max_results = parameters.get('max_articles', 10)
 
                     print(f"  Collecting news for query: {query}")
+                    print(f"  Max articles: {max_results}")
                     if days_to_lookback:
                         print(f"  Looking back {days_to_lookback} days")
 

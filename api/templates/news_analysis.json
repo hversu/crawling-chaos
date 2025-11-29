@@ -5,21 +5,19 @@
     "collectors": [
       {
         "type": "google_news",
-        "config": {
-          "max_results": 10
-        }
+        "config": {}
       }
     ],
     "analyzers": [
       {
         "type": "claude",
-        "system_prompt": "You are a concise intelligence analyst. Provide BLUF (Bottom Line Up Front) analysis with predictive assessments. Be direct and brief.",
-        "user_prompt_template": "Analyze these {article_count} articles using strict BLUF format:\n\n**BLUF:** [1-2 sentence bottom line]\n\n**KEY DEVELOPMENTS:**\n- [3-5 bullet points, max 15 words each]\n\n**PREDICTIONS:** (next 30-90 days)\n1. [Prediction] - Probability: [%]\n2. [Prediction] - Probability: [%]\n3. [Prediction] - Probability: [%]\n\n**IMPLICATIONS:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nKeep total response under 250 words. Be direct and actionable."
+        "system_prompt": "You are an intelligence analyst writing a brief. Use plain text only - no markdown, asterisks, or special formatting. Write tight, high-signal analysis.",
+        "user_prompt_template": "Analyze these {article_count} articles. Write a 150-word brief with this exact structure:\n\nBOTTOM LINE:\n[One sentence capturing the key takeaway]\n\nKEY POINTS:\n[3-4 bullets, 10 words max each]\n\nFORECAST (30-60 days):\n[2-3 specific predictions with probability %]\n\nIMPACT:\n[1-2 bullets on what matters]\n\nArticles:\n{articles}\n\nRules: No markdown. No asterisks. No bold. Plain text only. Under 150 words total."
       },
       {
         "type": "gpt",
-        "system_prompt": "You are a concise strategic analyst. Provide BLUF-style intelligence briefs with probabilistic forecasts. No fluff.",
-        "user_prompt_template": "Brief these {article_count} articles in BLUF format:\n\n**BLUF:** [1-2 sentence summary]\n\n**CRITICAL POINTS:**\n- [3-5 bullets, max 15 words each]\n\n**FORECAST:** (30-90 day outlook)\n1. [Specific prediction] - Confidence: [%]\n2. [Specific prediction] - Confidence: [%]\n3. [Specific prediction] - Confidence: [%]\n\n**STRATEGIC IMPACT:**\n- [2-3 bullets, max 15 words each]\n\n{articles}\n\nLimit to 250 words total. Be specific and actionable."
+        "system_prompt": "You are a strategic analyst writing an intelligence brief. Use plain text only - no markdown or special characters. Maximum clarity, minimum words.",
+        "user_prompt_template": "Brief these {article_count} articles in 150 words:\n\nBOTTOM LINE:\n[One sentence - the key insight]\n\nCRITICAL FACTS:\n[3-4 bullets, 10 words max each]\n\nPREDICTIONS (30-60 days):\n[2-3 specific forecasts with confidence %]\n\nWHAT MATTERS:\n[1-2 bullets on implications]\n\nArticles:\n{articles}\n\nRules: Plain text only. No markdown. No asterisks. No bold. Under 150 words."
       }
     ]
   }

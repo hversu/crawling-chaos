@@ -3,7 +3,8 @@
   "template": "news_analysis",
   "parameters": {
     "google_search_query": "political instability OR economic crisis OR social unrest OR geopolitical tension",
-    "days_to_lookback": 7
+    "days_to_lookback": 7,
+    "max_articles": 20
   },
   "frequency_minutes": 720,
   "is_active": true

@@ -417,27 +417,12 @@ class JobHandler:
 
         self.running = True
 
-        # Check if there are any jobs, if not, create a default one
+        # Check if there are any jobs
         jobs = self.db.get_active_jobs()
         if len(jobs) == 0:
-            print("No jobs found. Creating default job from template...")
-            try:
-                template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'news_analysis.json')
-                with open(template_path, 'r') as f:
-                    template = json.load(f)
-
-                # Remove description field as it's not in the database schema
-                if 'description' in template:
-                    del template['description']
-
-                result = self.create_job(template)
-                if result['status'] == 'success':
-                    print(f"Created default job with ID: {result['job_id']}")
-                    jobs = self.db.get_active_jobs()  # Refresh jobs list
-                else:
-                    print(f"Failed to create default job: {result.get('message')}")
-            except Exception as e:
-                print(f"Error creating default job: {e}")
+            print("No jobs found. Use refresh_jobs script to load jobs from api/jobs/ folder.")
+        else:
+            print(f"Found {len(jobs)} active job(s)")
 
         self.schedule_jobs()
 

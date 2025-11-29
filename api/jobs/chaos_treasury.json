@@ -2,9 +2,9 @@
   "name": "CryptoChaosography",
   "template": "news_analysis",
   "parameters": {
-    "google_search_query": "cryptocurrency OR bitcoin OR ethereum OR SEC crypto OR crypto regulation OR crypto ETF OR blockchain adoption OR crypto exchange OR stablecoin OR DeFi OR institutional crypto OR crypto lawsuit OR whale activity OR crypto ban",
-    "days_to_lookback": 7,
-    "max_articles": 20
+    "google_search_query": "bitcoin OR ethereum OR crypto OR blockchain OR NFT OR Web3 OR coinbase OR binance OR SEC OR ripple OR solana OR cardano OR dogecoin",
+    "days_to_lookback": 3,
+    "max_articles": 25
   },
   "frequency_minutes": 60,
   "is_active": true

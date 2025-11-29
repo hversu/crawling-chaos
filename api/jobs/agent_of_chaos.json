@@ -2,8 +2,8 @@
   "name": "Agent of Chaos",
   "template": "news_analysis",
   "parameters": {
-    "google_search_query": "political instability OR economic crisis OR social unrest OR geopolitical tension",
-    "days_to_lookback": 30,
+    "google_search_query": "war OR conflict OR sanctions OR coup OR protest OR election OR diplomacy OR military OR terrorism OR refugee",
+    "days_to_lookback": 14,
     "max_articles": 20
   },
   "frequency_minutes": 720,

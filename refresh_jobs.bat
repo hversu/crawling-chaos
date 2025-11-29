@@ -18,5 +18,13 @@ echo Loaded %job_count% job(s)
 echo Restarting API...
 docker-compose restart api >nul 2>&1
 
-echo Done! Jobs refreshed and API restarted
+echo Waiting for API to start...
+timeout /t 5 /nobreak >nul
+
+echo Triggering jobs manually...
+for /L %%i in (1,1,%job_count%) do (
+    curl -s -X POST http://localhost:5000/api/jobs/%%i/execute >nul 2>&1
+)
+
+echo Done! Jobs refreshed and running
 echo Watch logs with: docker logs -f crawling-chaos-api

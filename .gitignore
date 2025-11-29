@@ -54,3 +54,4 @@ docker-compose.override.yml
 .coverage
 htmlcov/
 scratch.txt
+refresh_jobs.sh

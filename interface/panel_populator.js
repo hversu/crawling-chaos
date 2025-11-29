@@ -164,6 +164,13 @@ function createGrid() {
     const tabNav = document.getElementById('tabNav');
     const tabContent = document.getElementById('tabContent');
 
+    // Defensive null checks for cached page compatibility
+    if (!tabNav || !tabContent) {
+        console.error('Missing tabNav or tabContent elements - please hard refresh (Ctrl+F5)');
+        alert('⚠️ Page cache issue detected.\n\nPlease hard refresh:\n• Windows: Ctrl+F5\n• Mac: Cmd+Shift+R');
+        return;
+    }
+
     tabNav.innerHTML = '';
     tabContent.innerHTML = '';
 
@@ -339,9 +346,11 @@ function formatTimestamp(timestamp) {
  */
 function updateStatus(message) {
     const statusEl = document.getElementById('status');
-    if (statusEl) {
-        statusEl.textContent = message.toUpperCase();
+    if (!statusEl) {
+        console.warn('Status element not found - page may need hard refresh');
+        return;
     }
+    statusEl.textContent = message.toUpperCase();
 }
 
 /**
@@ -349,9 +358,11 @@ function updateStatus(message) {
  */
 function updateLastUpdateTime() {
     const lastUpdateEl = document.getElementById('lastUpdate');
-    if (lastUpdateEl) {
-        lastUpdateEl.textContent = new Date().toLocaleTimeString();
+    if (!lastUpdateEl) {
+        console.warn('Last update element not found - page may need hard refresh');
+        return;
     }
+    lastUpdateEl.textContent = new Date().toLocaleTimeString();
 }
 
 /**
@@ -360,6 +371,12 @@ function updateLastUpdateTime() {
 function setLoading(isLoading) {
     const loadingEl = document.getElementById('loading');
     const tabContent = document.getElementById('tabContent');
+
+    // Defensive null checks for cached page compatibility
+    if (!loadingEl || !tabContent) {
+        console.warn('Missing DOM elements - please hard refresh (Ctrl+F5)');
+        return;
+    }
 
     if (isLoading) {
         loadingEl.style.display = 'block';

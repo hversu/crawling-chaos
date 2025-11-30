@@ -75,18 +75,34 @@ class DatabaseHandler:
             with self.conn.cursor() as cur:
                 # Check if this is a template-based job or legacy job
                 if 'template' in job_config:
+                    # Resolve depends_on_job_name to depends_on_job_id if provided
+                    depends_on_job_id = job_config.get('depends_on_job_id')
+
+                    if not depends_on_job_id and job_config.get('depends_on_job_name'):
+                        parent_job_name = job_config.get('depends_on_job_name')
+                        cur.execute("""
+                            SELECT id FROM jobs WHERE name = %s LIMIT 1
+                        """, (parent_job_name,))
+                        result = cur.fetchone()
+                        if result:
+                            depends_on_job_id = result[0]
+                            print(f"Resolved parent job '{parent_job_name}' to ID {depends_on_job_id}")
+                        else:
+                            print(f"WARNING: Parent job '{parent_job_name}' not found")
+
                     # New template-based job
                     cur.execute("""
                         INSERT INTO jobs (
                             name, template_name, parameters,
-                            frequency_minutes, is_active
-                        ) VALUES (%s, %s, %s, %s, %s)
+                            frequency_minutes, depends_on_job_id, is_active
+                        ) VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """, (
                         job_config.get('name'),
                         job_config.get('template'),
                         Json(job_config.get('parameters', {})),
                         job_config.get('frequency_minutes'),
+                        depends_on_job_id,
                         job_config.get('is_active', True)
                     ))
                 else:
@@ -130,6 +146,20 @@ class DatabaseHandler:
             print(f"Error fetching jobs: {e}")
             return []
 
+    def get_dependent_jobs(self, parent_job_id: int) -> List[Dict[str, Any]]:
+        """Get all active jobs that depend on the specified parent job"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT * FROM jobs
+                    WHERE is_active = true AND depends_on_job_id = %s
+                    ORDER BY id
+                """, (parent_job_id,))
+                return [dict(row) for row in cur.fetchall()]
+        except Exception as e:
+            print(f"Error fetching dependent jobs: {e}")
+            return []
+
     def update_job_last_run(self, job_id: int):
         """Update job's last run timestamp"""
         try:
@@ -142,38 +172,40 @@ class DatabaseHandler:
             print(f"Error updating job: {e}")
             self.conn.rollback()
 
-    # News Results
-    def save_news_results(self, job_id: int, articles: List[Dict[str, Any]]) -> List[int]:
-        """Save news articles to database"""
-        article_ids = []
+    # Collections (Generic storage for all collector types)
+    def save_collection(self, job_id: int, collection_type: str, items: List[Dict[str, Any]]) -> List[int]:
+        """Save collection items to database (news, serpapi, scraped pages, etc.)"""
+        collection_ids = []
         try:
             with self.conn.cursor() as cur:
-                for article in articles:
+                for item in items:
                     cur.execute("""
-                        INSERT INTO news_results (
-                            job_id, title, summary, url, publish_date, raw_data
-                        ) VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO collections (
+                            job_id, collection_type, data
+                        ) VALUES (%s, %s, %s)
                         RETURNING id
                     """, (
                         job_id,
-                        article.get('title'),
-                        article.get('summary'),
-                        article.get('url'),
-                        article.get('publish_date'),
-                        Json(article)
+                        collection_type,
+                        Json(item)
                     ))
-                    article_ids.append(cur.fetchone()[0])
+                    collection_ids.append(cur.fetchone()[0])
                 self.conn.commit()
         except Exception as e:
-            print(f"Error saving news results: {e}")
+            print(f"Error saving collection ({collection_type}): {e}")
             self.conn.rollback()
-        return article_ids
+        return collection_ids
+
+    # Legacy method for backward compatibility
+    def save_news_results(self, job_id: int, articles: List[Dict[str, Any]]) -> List[int]:
+        """Save news articles (legacy wrapper around save_collection)"""
+        return self.save_collection(job_id, 'news', articles)
 
     # Claude Analysis
     def save_claude_analysis(
         self,
         job_id: int,
-        news_result_id: int,
+        collection_id: int,
         analysis_text: str,
         raw_response: Dict[str, Any]
     ) -> Optional[int]:
@@ -182,10 +214,10 @@ class DatabaseHandler:
             with self.conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO claude_analysis (
-                        job_id, news_result_id, analysis_text, raw_response
+                        job_id, collection_id, analysis_text, raw_response
                     ) VALUES (%s, %s, %s, %s)
                     RETURNING id
-                """, (job_id, news_result_id, analysis_text, Json(raw_response)))
+                """, (job_id, collection_id, analysis_text, Json(raw_response)))
                 analysis_id = cur.fetchone()[0]
                 self.conn.commit()
                 return analysis_id
@@ -198,7 +230,7 @@ class DatabaseHandler:
     def save_gpt_analysis(
         self,
         job_id: int,
-        news_result_id: int,
+        collection_id: int,
         analysis_text: str,
         raw_response: Dict[str, Any]
     ) -> Optional[int]:
@@ -207,10 +239,10 @@ class DatabaseHandler:
             with self.conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO gpt_analysis (
-                        job_id, news_result_id, analysis_text, raw_response
+                        job_id, collection_id, analysis_text, raw_response
                     ) VALUES (%s, %s, %s, %s)
                     RETURNING id
-                """, (job_id, news_result_id, analysis_text, Json(raw_response)))
+                """, (job_id, collection_id, analysis_text, Json(raw_response)))
                 analysis_id = cur.fetchone()[0]
                 self.conn.commit()
                 return analysis_id
@@ -220,29 +252,58 @@ class DatabaseHandler:
             return None
 
     # Data Retrieval for Frontend
-    def get_latest_news_results(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get latest news results for frontend"""
+    def get_latest_collections(self, collection_type: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get latest collections for frontend (optionally filtered by type)"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT nr.id, nr.job_id, nr.title, nr.summary, nr.url,
-                           nr.publish_date, nr.collected_at, j.name as job_name
-                    FROM news_results nr
-                    JOIN jobs j ON nr.job_id = j.id
-                    ORDER BY nr.collected_at DESC
-                    LIMIT %s
-                """, (limit,))
-                return [dict(row) for row in cur.fetchall()]
+                if collection_type:
+                    cur.execute("""
+                        SELECT c.id, c.job_id, c.collection_type, c.data,
+                               c.collected_at, j.name as job_name
+                        FROM collections c
+                        JOIN jobs j ON c.job_id = j.id
+                        WHERE c.collection_type = %s
+                        ORDER BY c.collected_at DESC
+                        LIMIT %s
+                    """, (collection_type, limit))
+                else:
+                    cur.execute("""
+                        SELECT c.id, c.job_id, c.collection_type, c.data,
+                               c.collected_at, j.name as job_name
+                        FROM collections c
+                        JOIN jobs j ON c.job_id = j.id
+                        ORDER BY c.collected_at DESC
+                        LIMIT %s
+                    """, (limit,))
+
+                results = []
+                for row in cur.fetchall():
+                    item = dict(row)
+                    # Extract commonly used fields from JSONB for convenience
+                    data = item.get('data', {})
+                    if collection_type == 'news':
+                        item['title'] = data.get('title')
+                        item['summary'] = data.get('summary')
+                        item['url'] = data.get('url')
+                        item['publish_date'] = data.get('publish_date')
+                    results.append(item)
+
+                return results
         except Exception as e:
-            print(f"Error fetching news results: {e}")
+            print(f"Error fetching collections: {e}")
             return []
+
+    # Legacy method for backward compatibility
+    def get_latest_news_results(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get latest news results (legacy wrapper)"""
+        return self.get_latest_collections(collection_type='news', limit=limit)
 
     def get_latest_claude_analysis(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Get latest Claude analyses for frontend"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT ca.id, ca.job_id, ca.news_result_id, ca.analysis_text,
+                    SELECT ca.id, ca.job_id, ca.collection_id, ca.analysis_text,
                            ca.created_at, j.name as job_name
                     FROM claude_analysis ca
                     JOIN jobs j ON ca.job_id = j.id
@@ -259,7 +320,7 @@ class DatabaseHandler:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT ga.id, ga.job_id, ga.news_result_id, ga.analysis_text,
+                    SELECT ga.id, ga.job_id, ga.collection_id, ga.analysis_text,
                            ga.created_at, j.name as job_name
                     FROM gpt_analysis ga
                     JOIN jobs j ON ga.job_id = j.id
@@ -270,6 +331,68 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error fetching GPT analysis: {e}")
             return []
+
+    # Search Queries
+    def save_search_queries(
+        self,
+        job_id: int,
+        parent_analysis_id: int,
+        queries: List[Dict[str, Any]],
+        justification: str,
+        raw_response: Dict[str, Any]
+    ) -> Optional[int]:
+        """Save search queries generated by Claude"""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO search_queries (
+                        job_id, parent_analysis_id, queries, justification, raw_response
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (job_id, parent_analysis_id, Json(queries), justification, Json(raw_response)))
+                query_id = cur.fetchone()[0]
+                self.conn.commit()
+                return query_id
+        except Exception as e:
+            print(f"Error saving search queries: {e}")
+            self.conn.rollback()
+            return None
+
+    def get_latest_search_queries(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get latest search queries for frontend"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT sq.id, sq.job_id, sq.parent_analysis_id, sq.queries,
+                           sq.justification, sq.created_at, j.name as job_name
+                    FROM search_queries sq
+                    JOIN jobs j ON sq.job_id = j.id
+                    ORDER BY sq.created_at DESC
+                    LIMIT %s
+                """, (limit,))
+                return [dict(row) for row in cur.fetchall()]
+        except Exception as e:
+            print(f"Error fetching search queries: {e}")
+            return []
+
+    def get_latest_claude_analysis_by_job(self, job_id: int) -> Optional[Dict[str, Any]]:
+        """Get the most recent Claude analysis for a specific job"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT ca.id, ca.job_id, ca.collection_id, ca.analysis_text,
+                           ca.raw_response, ca.created_at, j.name as job_name
+                    FROM claude_analysis ca
+                    JOIN jobs j ON ca.job_id = j.id
+                    WHERE ca.job_id = %s
+                    ORDER BY ca.created_at DESC
+                    LIMIT 1
+                """, (job_id,))
+                result = cur.fetchone()
+                return dict(result) if result else None
+        except Exception as e:
+            print(f"Error fetching Claude analysis by job: {e}")
+            return None
 
 
 if __name__ == '__main__':

@@ -10,7 +10,9 @@ const PANELS_PER_ROW = 3;
 let allData = {
     news: [],
     claude: [],
-    gpt: []
+    gpt: [],
+    search_queries: [],
+    serpapi_collections: []
 };
 
 /**
@@ -20,15 +22,19 @@ async function fetchAllData() {
     try {
         updateStatus('Fetching data...');
 
-        const [newsResponse, claudeResponse, gptResponse] = await Promise.all([
+        const [newsResponse, claudeResponse, gptResponse, queriesResponse, serpapiResponse] = await Promise.all([
             fetch(`${API_BASE_URL}/api/data/news`),
             fetch(`${API_BASE_URL}/api/data/claude`),
-            fetch(`${API_BASE_URL}/api/data/gpt`)
+            fetch(`${API_BASE_URL}/api/data/gpt`),
+            fetch(`${API_BASE_URL}/api/data/search_queries`),
+            fetch(`${API_BASE_URL}/api/data/collections?type=serpapi`)
         ]);
 
         const newsData = await newsResponse.json();
         const claudeData = await claudeResponse.json();
         const gptData = await gptResponse.json();
+        const queriesData = await queriesResponse.json();
+        const serpapiData = await serpapiResponse.json();
 
         if (newsData.status === 'success') {
             allData.news = newsData.data;
@@ -40,6 +46,14 @@ async function fetchAllData() {
 
         if (gptData.status === 'success') {
             allData.gpt = gptData.data;
+        }
+
+        if (queriesData.status === 'success') {
+            allData.search_queries = queriesData.data;
+        }
+
+        if (serpapiData.status === 'success') {
+            allData.serpapi_collections = serpapiData.data;
         }
 
         updateStatus('Ready');
@@ -158,6 +172,189 @@ function createAnalysisPanel(type, data) {
 }
 
 /**
+ * Create INPUT ANALYSIS panel for Deep Dive (shows parent analysis)
+ */
+function createInputAnalysisPanel(claudeAnalyses, jobName) {
+    const panel = document.createElement('div');
+    panel.className = 'panel input-analysis';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
+
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'panel-type';
+    typeLabel.textContent = 'INPUT ANALYSIS';
+
+    const timestamp = document.createElement('span');
+    timestamp.className = 'panel-timestamp';
+
+    header.appendChild(typeLabel);
+    header.appendChild(timestamp);
+
+    const content = document.createElement('div');
+    content.className = 'panel-content';
+
+    if (claudeAnalyses.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = 'No input analysis available';
+        content.appendChild(empty);
+    } else {
+        const latest = claudeAnalyses[0];
+        timestamp.textContent = formatTimestamp(latest.created_at);
+
+        const analysis = document.createElement('div');
+        analysis.className = 'analysis-text';
+        analysis.textContent = latest.analysis_text || 'No analysis available';
+
+        content.appendChild(analysis);
+    }
+
+    panel.appendChild(header);
+    panel.appendChild(content);
+
+    return panel;
+}
+
+/**
+ * Create SEARCH QUERIES panel for Deep Dive
+ */
+function createSearchQueriesPanel(searchQueries, jobName) {
+    const panel = document.createElement('div');
+    panel.className = 'panel search-queries';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
+
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'panel-type';
+    typeLabel.textContent = 'SEARCH QUERIES';
+
+    const count = document.createElement('span');
+    count.className = 'panel-count';
+
+    header.appendChild(typeLabel);
+    header.appendChild(count);
+
+    const content = document.createElement('div');
+    content.className = 'panel-content';
+
+    if (searchQueries.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = 'No search queries generated yet';
+        content.appendChild(empty);
+    } else {
+        const latest = searchQueries[0];
+        const queries = latest.queries || [];
+        count.textContent = `${queries.length} queries`;
+
+        // Justification
+        if (latest.justification) {
+            const justDiv = document.createElement('div');
+            justDiv.className = 'query-justification';
+            justDiv.innerHTML = `<strong>Strategy:</strong> ${latest.justification}`;
+            content.appendChild(justDiv);
+        }
+
+        // Queries list
+        const list = document.createElement('div');
+        list.className = 'queries-list';
+
+        queries.forEach((q, idx) => {
+            const item = document.createElement('div');
+            item.className = 'query-item';
+
+            const queryText = document.createElement('h4');
+            queryText.className = 'query-text';
+            queryText.textContent = `${idx + 1}. ${q.query}`;
+
+            const reason = document.createElement('p');
+            reason.className = 'query-reason';
+            reason.textContent = q.reason;
+
+            item.appendChild(queryText);
+            item.appendChild(reason);
+            list.appendChild(item);
+        });
+
+        content.appendChild(list);
+    }
+
+    panel.appendChild(header);
+    panel.appendChild(content);
+
+    return panel;
+}
+
+/**
+ * Create SEARCH RESULTS panel for Deep Dive
+ */
+function createSearchResultsPanel(serpapiCollections, jobName) {
+    const panel = document.createElement('div');
+    panel.className = 'panel search-results';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
+
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'panel-type';
+    typeLabel.textContent = 'SEARCH RESULTS';
+
+    const count = document.createElement('span');
+    count.className = 'panel-count';
+    count.textContent = `${serpapiCollections.length} results`;
+
+    header.appendChild(typeLabel);
+    header.appendChild(count);
+
+    const content = document.createElement('div');
+    content.className = 'panel-content';
+
+    if (serpapiCollections.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = 'No search results yet';
+        content.appendChild(empty);
+    } else {
+        const list = document.createElement('div');
+        list.className = 'results-list';
+
+        serpapiCollections.forEach(collection => {
+            const data = collection.data || {};
+            const item = document.createElement('div');
+            item.className = 'result-item';
+
+            const title = document.createElement('h4');
+            title.className = 'result-title';
+            title.textContent = data.title || 'Untitled';
+
+            const snippet = document.createElement('p');
+            snippet.className = 'result-snippet';
+            snippet.textContent = data.snippet || '';
+
+            const link = document.createElement('a');
+            link.className = 'result-link';
+            link.href = data.url || '#';
+            link.textContent = data.displayed_link || data.url || '';
+            link.target = '_blank';
+
+            item.appendChild(title);
+            item.appendChild(snippet);
+            item.appendChild(link);
+            list.appendChild(item);
+        });
+
+        content.appendChild(list);
+    }
+
+    panel.appendChild(header);
+    panel.appendChild(content);
+
+    return panel;
+}
+
+/**
  * Create tabbed layout: Each job gets its own tab with 3-column grid
  */
 function createGrid() {
@@ -215,17 +412,28 @@ function createGrid() {
         const panelGrid = document.createElement('div');
         panelGrid.className = 'panel-grid';
 
-        // Create NEWS panel
-        const newsPanel = createNewsListPanel(jobData.news, jobData.jobName);
-        panelGrid.appendChild(newsPanel);
+        // Check if this is a Deep Dive job
+        if (jobData.jobName === 'Deep Dive') {
+            // Special layout for Deep Dive: Input Analysis, Search Queries, Search Results
+            const inputPanel = createInputAnalysisPanel(jobData.claude, jobData.jobName);
+            panelGrid.appendChild(inputPanel);
 
-        // Create CLAUDE analysis panel
-        const claudePanel = createAnalysisPanel('claude', jobData.claude);
-        panelGrid.appendChild(claudePanel);
+            const queriesPanel = createSearchQueriesPanel(jobData.search_queries, jobData.jobName);
+            panelGrid.appendChild(queriesPanel);
 
-        // Create GPT analysis panel
-        const gptPanel = createAnalysisPanel('gpt', jobData.gpt);
-        panelGrid.appendChild(gptPanel);
+            const resultsPanel = createSearchResultsPanel(jobData.serpapi_collections, jobData.jobName);
+            panelGrid.appendChild(resultsPanel);
+        } else {
+            // Standard layout for other jobs: News, Claude, GPT
+            const newsPanel = createNewsListPanel(jobData.news, jobData.jobName);
+            panelGrid.appendChild(newsPanel);
+
+            const claudePanel = createAnalysisPanel('claude', jobData.claude);
+            panelGrid.appendChild(claudePanel);
+
+            const gptPanel = createAnalysisPanel('gpt', jobData.gpt);
+            panelGrid.appendChild(gptPanel);
+        }
 
         tabPanel.appendChild(panelGrid);
         tabContent.appendChild(tabPanel);
@@ -271,7 +479,9 @@ function groupDataByJob() {
                 jobName: item.job_name || `Job ${jobId}`,
                 news: [],
                 claude: [],
-                gpt: []
+                gpt: [],
+                search_queries: [],
+                serpapi_collections: []
             };
         }
         groups[jobId].news.push(item);
@@ -285,7 +495,9 @@ function groupDataByJob() {
                 jobName: item.job_name || `Job ${jobId}`,
                 news: [],
                 claude: [],
-                gpt: []
+                gpt: [],
+                search_queries: [],
+                serpapi_collections: []
             };
         }
         groups[jobId].claude.push(item);
@@ -299,10 +511,44 @@ function groupDataByJob() {
                 jobName: item.job_name || `Job ${jobId}`,
                 news: [],
                 claude: [],
-                gpt: []
+                gpt: [],
+                search_queries: [],
+                serpapi_collections: []
             };
         }
         groups[jobId].gpt.push(item);
+    });
+
+    // Group search queries by job_id
+    allData.search_queries.forEach(item => {
+        const jobId = item.job_id;
+        if (!groups[jobId]) {
+            groups[jobId] = {
+                jobName: item.job_name || `Job ${jobId}`,
+                news: [],
+                claude: [],
+                gpt: [],
+                search_queries: [],
+                serpapi_collections: []
+            };
+        }
+        groups[jobId].search_queries.push(item);
+    });
+
+    // Group SerpAPI collections by job_id
+    allData.serpapi_collections.forEach(item => {
+        const jobId = item.job_id;
+        if (!groups[jobId]) {
+            groups[jobId] = {
+                jobName: item.job_name || `Job ${jobId}`,
+                news: [],
+                claude: [],
+                gpt: [],
+                search_queries: [],
+                serpapi_collections: []
+            };
+        }
+        groups[jobId].serpapi_collections.push(item);
     });
 
     return groups;

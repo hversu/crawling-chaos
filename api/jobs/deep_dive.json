@@ -1,0 +1,7 @@
+{
+  "name": "Deep Dive",
+  "template": "deep_dive",
+  "parameters": {},
+  "depends_on_job_name": "Agent of Chaos",
+  "is_active": true
+}

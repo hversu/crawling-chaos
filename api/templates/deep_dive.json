@@ -1,0 +1,29 @@
+{
+  "name": "deep_dive",
+  "description": "Takes analysis from parent job and generates targeted web searches",
+  "workflow": {
+    "input_source": {
+      "type": "parent_job_analysis",
+      "analyzer": "claude"
+    },
+    "analyzers": [
+      {
+        "type": "claude",
+        "name": "query_generator",
+        "system_prompt": "You are a research analyst specializing in generating targeted web search queries. Your task is to analyze a news summary and determine 3-5 highly specific web search queries that would help dive deeper into the most important aspects.\n\nOutput ONLY valid JSON in this exact format:\n{\n  \"queries\": [\n    {\"query\": \"specific search term 1\", \"reason\": \"why this query matters\"},\n    {\"query\": \"specific search term 2\", \"reason\": \"why this query matters\"}\n  ],\n  \"justification\": \"Overall explanation of search strategy\"\n}\n\nUse concrete terms, names, organizations, and specific events. Avoid generic queries.",
+        "user_prompt_template": "Analyze this intelligence summary and generate 3-5 targeted web search queries:\n\n{analysis_text}\n\nGenerate queries that would uncover:\n1. Deeper context and background\n2. Key players and their motivations\n3. Historical precedents\n4. Potential implications\n5. Primary sources or official statements\n\nOutput ONLY the JSON object with your queries and justification.",
+        "output_format": "json"
+      }
+    ],
+    "collectors": [
+      {
+        "type": "serpapi",
+        "config": {
+          "search_type": "organic",
+          "max_results": 10
+        },
+        "input_source": "query_generator_output"
+      }
+    ]
+  }
+}

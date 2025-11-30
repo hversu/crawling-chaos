@@ -87,11 +87,34 @@ class JobHandler:
         if not job:
             return {'status': 'error', 'message': 'Job not found'}
 
-        # Check if job uses template (new style) or direct config (old style)
+        # Execute the job
         if job.get('template_name'):
-            return self._execute_templated_job(job_id, job)
+            result = self._execute_templated_job(job_id, job)
         else:
-            return self._execute_legacy_job(job_id, job)
+            result = self._execute_legacy_job(job_id, job)
+
+        # After successful execution, trigger any dependent jobs
+        if result.get('status') == 'success':
+            self._trigger_dependent_jobs(job_id)
+
+        return result
+
+    def _trigger_dependent_jobs(self, parent_job_id: int):
+        """Trigger jobs that depend on the completed parent job"""
+        dependent_jobs = self.db.get_dependent_jobs(parent_job_id)
+
+        if dependent_jobs:
+            print(f"  Triggering {len(dependent_jobs)} dependent job(s)...")
+
+            for dep_job in dependent_jobs:
+                dep_job_id = dep_job['id']
+                dep_job_name = dep_job['name']
+                print(f"  -> Executing dependent job: {dep_job_name} (ID: {dep_job_id})")
+
+                try:
+                    self.execute_job(dep_job_id)
+                except Exception as e:
+                    print(f"  ERROR executing dependent job {dep_job_id}: {e}")
 
     def _execute_templated_job(self, job_id: int, job: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -113,6 +136,18 @@ class JobHandler:
                 'status': 'error',
                 'message': f"Template not found: {job['template_name']}"
             }
+
+        # Check if this is a deep_dive template (requires parent job analysis)
+        workflow = template.get('workflow', {})
+        input_source = workflow.get('input_source', {})
+
+        if input_source.get('type') == 'parent_job_analysis':
+            return self._execute_deep_dive_job(job_id, job, template)
+        else:
+            return self._execute_standard_templated_job(job_id, job, template)
+
+    def _execute_standard_templated_job(self, job_id: int, job: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a standard templated job (news_analysis type)"""
 
         results = {
             'job_id': job_id,
@@ -200,6 +235,132 @@ class JobHandler:
             print(f"  Job execution error: {e}")
 
         return results
+
+    def _execute_deep_dive_job(self, job_id: int, job: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a deep_dive template job that takes parent analysis as input"""
+        results = {
+            'job_id': job_id,
+            'started_at': datetime.utcnow().isoformat(),
+            'queries_generated': 0,
+            'searches_performed': 0,
+            'results_collected': 0,
+            'errors': []
+        }
+
+        try:
+            # Get parent job ID from dependencies
+            parent_job_id = job.get('depends_on_job_id')
+            if not parent_job_id:
+                return {
+                    'status': 'error',
+                    'message': 'Deep dive job requires depends_on_job_id'
+                }
+
+            print(f"  Deep dive triggered by parent job {parent_job_id}")
+
+            # Get latest Claude analysis from parent job
+            parent_analysis = self.db.get_latest_claude_analysis_by_job(parent_job_id)
+            if not parent_analysis:
+                return {
+                    'status': 'error',
+                    'message': f'No Claude analysis found for parent job {parent_job_id}'
+                }
+
+            analysis_text = parent_analysis.get('analysis_text', '')
+            analysis_id = parent_analysis.get('id')
+            print(f"  Using parent analysis ID {analysis_id}")
+
+            # Get analyzers from template
+            analyzers = self.template_handler.get_analyzers(template)
+            query_generator = next((a for a in analyzers if a.get('name') == 'query_generator'), None)
+
+            if not query_generator or not self.claude_handler:
+                return {
+                    'status': 'error',
+                    'message': 'Query generator not found in template or Claude handler not available'
+                }
+
+            # Generate search queries using Claude
+            print(f"  Generating search queries from analysis...")
+            query_result = self.claude_handler.generate_search_queries(
+                analysis_text=analysis_text,
+                system_prompt=query_generator.get('system_prompt'),
+                user_prompt_template=query_generator.get('user_prompt_template')
+            )
+
+            if query_result['status'] != 'success':
+                return {
+                    'status': 'error',
+                    'message': f"Query generation failed: {query_result.get('error')}"
+                }
+
+            queries = query_result.get('queries', [])
+            justification = query_result.get('justification', '')
+            print(f"  Generated {len(queries)} search queries")
+
+            # Save search queries to database
+            query_id = self.db.save_search_queries(
+                job_id=job_id,
+                parent_analysis_id=analysis_id,
+                queries=queries,
+                justification=justification,
+                raw_response=query_result.get('raw_response', {})
+            )
+            results['queries_generated'] = len(queries)
+
+            # Execute SerpAPI searches for each query
+            from api.collectors.serpapi import SerpAPICollector
+
+            try:
+                serpapi_collector = SerpAPICollector()
+
+                for query_obj in queries:
+                    query_text = query_obj.get('query', '')
+                    print(f"  Searching: {query_text}")
+
+                    search_result = serpapi_collector.collect(
+                        query=query_text,
+                        max_results=10,
+                        search_type='organic'
+                    )
+
+                    if search_result['status'] == 'success':
+                        # Save search results to collections
+                        search_results = search_result.get('results', [])
+                        if search_results:
+                            collection_ids = self.db.save_collection(
+                                job_id=job_id,
+                                collection_type='serpapi',
+                                items=search_results
+                            )
+                            results['results_collected'] += len(collection_ids)
+                            results['searches_performed'] += 1
+                    else:
+                        error_msg = f"SerpAPI search failed for '{query_text}': {search_result.get('error')}"
+                        print(f"  ERROR: {error_msg}")
+                        results['errors'].append(error_msg)
+
+            except Exception as e:
+                error_msg = f"SerpAPI collector error: {str(e)}"
+                print(f"  ERROR: {error_msg}")
+                results['errors'].append(error_msg)
+
+            # Update job last run time
+            self.db.update_job_last_run(job_id)
+
+            results['status'] = 'success'
+            results['completed_at'] = datetime.utcnow().isoformat()
+
+            print(f"  Deep dive complete: {results['queries_generated']} queries, {results['searches_performed']} searches, {results['results_collected']} results")
+
+            return results
+
+        except Exception as e:
+            error_msg = f"Deep dive job error: {str(e)}"
+            print(f"  ERROR: {error_msg}")
+            results['errors'].append(error_msg)
+            results['status'] = 'error'
+            return results
 
     def _execute_legacy_job(self, job_id: int, job: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -316,7 +477,7 @@ class JobHandler:
             if claude_result['status'] == 'success':
                 analysis_id = self.db.save_claude_analysis(
                     job_id=job_id,
-                    news_result_id=article_ids[0] if article_ids else None,
+                    collection_id=article_ids[0] if article_ids else None,
                     analysis_text=claude_result['analysis'],
                     raw_response=claude_result.get('raw_response', {})
                 )
@@ -370,7 +531,7 @@ class JobHandler:
             if gpt_result['status'] == 'success':
                 analysis_id = self.db.save_gpt_analysis(
                     job_id=job_id,
-                    news_result_id=article_ids[0] if article_ids else None,
+                    collection_id=article_ids[0] if article_ids else None,
                     analysis_text=gpt_result['analysis'],
                     raw_response=gpt_result.get('raw_response', {})
                 )

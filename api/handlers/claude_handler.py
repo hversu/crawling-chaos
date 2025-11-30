@@ -160,6 +160,82 @@ class ClaudeHandler:
                 'analysis': None
             }
 
+    def generate_search_queries(
+        self,
+        analysis_text: str,
+        system_prompt: str,
+        user_prompt_template: str,
+        model: str = None,
+        max_tokens: int = 4096
+    ) -> Dict[str, Any]:
+        """
+        Generate web search queries from an analysis using Claude
+
+        Args:
+            analysis_text: The analysis text to use as input
+            system_prompt: System prompt for query generation
+            user_prompt_template: User prompt template with {analysis_text} placeholder
+            model: Claude model to use
+            max_tokens: Maximum tokens in response
+
+        Returns:
+            Dictionary with status, queries list, and justification
+        """
+        try:
+            # Format the user prompt
+            user_prompt = user_prompt_template.format(analysis_text=analysis_text)
+
+            # Call Claude
+            message = self.client.messages.create(
+                model=model or self.default_model,
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
+            )
+
+            # Extract text content from response
+            response_text = ""
+            if message.content:
+                for block in message.content:
+                    if hasattr(block, 'text'):
+                        response_text += block.text
+
+            # Parse JSON response
+            try:
+                parsed_response = json.loads(response_text)
+                queries = parsed_response.get('queries', [])
+                justification = parsed_response.get('justification', '')
+
+                return {
+                    'status': 'success',
+                    'queries': queries,
+                    'justification': justification,
+                    'raw_response': {
+                        'id': message.id,
+                        'type': message.type,
+                        'role': message.role,
+                        'text': response_text
+                    },
+                    'usage': {
+                        'input_tokens': message.usage.input_tokens,
+                        'output_tokens': message.usage.output_tokens
+                    }
+                }
+            except json.JSONDecodeError as je:
+                return {
+                    'status': 'error',
+                    'error': f'JSON parse error: {str(je)}',
+                    'raw_text': response_text
+                }
+
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': str(e)
+            }
+
 
 def analyze_with_claude(
     system_prompt: str,

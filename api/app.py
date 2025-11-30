@@ -171,6 +171,47 @@ def get_gpt_data():
         }), 500
 
 
+@app.route('/api/data/collections', methods=['GET'])
+def get_collections_data():
+    """Get latest collections (optionally filtered by type)"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        collection_type = request.args.get('type', None)
+        collections = db_handler.get_latest_collections(
+            collection_type=collection_type,
+            limit=limit
+        )
+        return jsonify({
+            'status': 'success',
+            'data': collections,
+            'count': len(collections),
+            'collection_type': collection_type
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/data/search_queries', methods=['GET'])
+def get_search_queries_data():
+    """Get latest search queries for frontend"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        queries = db_handler.get_latest_search_queries(limit=limit)
+        return jsonify({
+            'status': 'success',
+            'data': queries,
+            'count': len(queries)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 # Template loading
 @app.route('/api/templates/<template_name>', methods=['GET'])
 def get_template(template_name):

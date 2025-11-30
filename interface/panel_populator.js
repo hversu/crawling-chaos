@@ -174,7 +174,7 @@ function createAnalysisPanel(type, data) {
 /**
  * Create INPUT ANALYSIS panel for Deep Dive (shows parent analysis)
  */
-function createInputAnalysisPanel(claudeAnalyses, jobName) {
+function createInputAnalysisPanel(searchQueries, jobName) {
     const panel = document.createElement('div');
     panel.className = 'panel input-analysis';
 
@@ -194,18 +194,18 @@ function createInputAnalysisPanel(claudeAnalyses, jobName) {
     const content = document.createElement('div');
     content.className = 'panel-content';
 
-    if (claudeAnalyses.length === 0) {
+    if (searchQueries.length === 0 || !searchQueries[0].parent_analysis_text) {
         const empty = document.createElement('p');
         empty.className = 'empty-message';
         empty.textContent = 'No input analysis available';
         content.appendChild(empty);
     } else {
-        const latest = claudeAnalyses[0];
-        timestamp.textContent = formatTimestamp(latest.created_at);
+        const latest = searchQueries[0];
+        timestamp.textContent = latest.parent_job_name || 'Parent Job';
 
         const analysis = document.createElement('div');
         analysis.className = 'analysis-text';
-        analysis.textContent = latest.analysis_text || 'No analysis available';
+        analysis.textContent = latest.parent_analysis_text || 'No analysis available';
 
         content.appendChild(analysis);
     }
@@ -415,7 +415,7 @@ function createGrid() {
         // Check if this is a Deep Dive job
         if (jobData.jobName === 'Deep Dive') {
             // Special layout for Deep Dive: Input Analysis, Search Queries, Search Results
-            const inputPanel = createInputAnalysisPanel(jobData.claude, jobData.jobName);
+            const inputPanel = createInputAnalysisPanel(jobData.search_queries, jobData.jobName);
             panelGrid.appendChild(inputPanel);
 
             const queriesPanel = createSearchQueriesPanel(jobData.search_queries, jobData.jobName);

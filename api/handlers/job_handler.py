@@ -327,14 +327,18 @@ class JobHandler:
                     if search_result['status'] == 'success':
                         # Save search results to collections
                         search_results = search_result.get('results', [])
+                        print(f"  SerpAPI returned {len(search_results)} results")
                         if search_results:
                             collection_ids = self.db.save_collection(
                                 job_id=job_id,
                                 collection_type='serpapi',
                                 items=search_results
                             )
+                            print(f"  Saved {len(collection_ids)} results to collections table")
                             results['results_collected'] += len(collection_ids)
                             results['searches_performed'] += 1
+                        else:
+                            print(f"  WARNING: SerpAPI returned success but no results")
                     else:
                         error_msg = f"SerpAPI search failed for '{query_text}': {search_result.get('error')}"
                         print(f"  ERROR: {error_msg}")

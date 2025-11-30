@@ -359,14 +359,19 @@ class DatabaseHandler:
             return None
 
     def get_latest_search_queries(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get latest search queries for frontend"""
+        """Get latest search queries for frontend with parent analysis"""
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT sq.id, sq.job_id, sq.parent_analysis_id, sq.queries,
-                           sq.justification, sq.created_at, j.name as job_name
+                           sq.justification, sq.created_at, j.name as job_name,
+                           ca.analysis_text as parent_analysis_text,
+                           ca.job_id as parent_job_id,
+                           pj.name as parent_job_name
                     FROM search_queries sq
                     JOIN jobs j ON sq.job_id = j.id
+                    LEFT JOIN claude_analysis ca ON sq.parent_analysis_id = ca.id
+                    LEFT JOIN jobs pj ON ca.job_id = pj.id
                     ORDER BY sq.created_at DESC
                     LIMIT %s
                 """, (limit,))

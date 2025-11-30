@@ -202,9 +202,20 @@ class ClaudeHandler:
                     if hasattr(block, 'text'):
                         response_text += block.text
 
-            # Parse JSON response
+            # Parse JSON response (strip markdown code blocks if present)
             try:
-                parsed_response = json.loads(response_text)
+                # Remove markdown code blocks if present
+                clean_text = response_text.strip()
+                if clean_text.startswith('```'):
+                    # Find the first newline after opening ```
+                    first_newline = clean_text.find('\n')
+                    if first_newline != -1:
+                        clean_text = clean_text[first_newline + 1:]
+                    # Remove closing ```
+                    if clean_text.endswith('```'):
+                        clean_text = clean_text[:-3].rstrip()
+
+                parsed_response = json.loads(clean_text)
                 queries = parsed_response.get('queries', [])
                 justification = parsed_response.get('justification', '')
 

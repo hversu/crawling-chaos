@@ -561,6 +561,15 @@ class JobHandler:
         for job in jobs:
             frequency = job['frequency_minutes']
             job_id = job['id']
+            depends_on = job.get('depends_on_job_id')
+
+            # Skip jobs that are dependency-driven only (no frequency)
+            if frequency is None:
+                if depends_on:
+                    print(f"Job {job_id} ({job['name']}) is dependency-driven, will run after job {depends_on}")
+                else:
+                    print(f"WARNING: Job {job_id} ({job['name']}) has no frequency and no dependency")
+                continue
 
             # Schedule job
             schedule.every(frequency).minutes.do(self.execute_job, job_id=job_id)

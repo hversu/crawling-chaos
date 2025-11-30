@@ -309,7 +309,7 @@ class JobHandler:
             results['queries_generated'] = len(queries)
 
             # Execute SerpAPI searches for each query
-            from api.collectors.serpapi import SerpAPICollector
+            from collectors.serpapi import SerpAPICollector
 
             try:
                 serpapi_collector = SerpAPICollector()

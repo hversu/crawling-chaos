@@ -288,15 +288,22 @@ class JobHandler:
                 user_prompt_template=query_generator.get('user_prompt_template')
             )
 
+            print(f"  Query result status: {query_result.get('status')}")
             if query_result['status'] != 'success':
+                error_msg = query_result.get('error', 'Unknown error')
+                print(f"  ERROR: Query generation failed: {error_msg}")
+                if 'raw_text' in query_result:
+                    print(f"  Raw response: {query_result['raw_text'][:500]}")
                 return {
                     'status': 'error',
-                    'message': f"Query generation failed: {query_result.get('error')}"
+                    'message': f"Query generation failed: {error_msg}"
                 }
 
             queries = query_result.get('queries', [])
             justification = query_result.get('justification', '')
             print(f"  Generated {len(queries)} search queries")
+            for i, q in enumerate(queries, 1):
+                print(f"    Query {i}: {q.get('query', 'N/A')}")
 
             # Save search queries to database
             query_id = self.db.save_search_queries(
@@ -310,9 +317,19 @@ class JobHandler:
 
             # Execute SerpAPI searches for each query
             from collectors.serpapi import SerpAPICollector
+            import os
 
             try:
+                # Check if API key is set
+                if not os.getenv('SERPAPI_API_KEY'):
+                    error_msg = "SERPAPI_API_KEY not found in environment variables"
+                    print(f"  ERROR: {error_msg}")
+                    results['errors'].append(error_msg)
+                    results['status'] = 'error'
+                    return results
+
                 serpapi_collector = SerpAPICollector()
+                print(f"  SerpAPI collector initialized")
 
                 for query_obj in queries:
                     query_text = query_obj.get('query', '')
@@ -360,8 +377,10 @@ class JobHandler:
             return results
 
         except Exception as e:
+            import traceback
             error_msg = f"Deep dive job error: {str(e)}"
             print(f"  ERROR: {error_msg}")
+            print(f"  TRACEBACK: {traceback.format_exc()}")
             results['errors'].append(error_msg)
             results['status'] = 'error'
             return results

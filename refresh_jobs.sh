@@ -7,3 +7,5 @@
   # Restart and watch the new logging
   docker compose restart api
   docker logs -f crawling-chaos-api
+
+   docker logs --tail 200 crawling-chaos-api 2>&1 | grep -i "error\|exception\|traceback" | tail -20
